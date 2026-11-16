@@ -5,9 +5,13 @@ import type { SVGProps } from "react";
  * `assets/brand/`; keep both in sync. Colors come from the brand tokens in `styles.css`.
  */
 
-export type RondoTone = "light" | "dark";
+/**
+ * `light` and `dark` are fixed versions (e-mails, files, forced backgrounds). `auto` follows the
+ * app theme through `--logo-outline` and `--logo-left` (tokens.css) and is the default in the UI.
+ */
+export type RondoTone = "light" | "dark" | "auto";
 
-type Fill = "orange" | "yellow" | "lime" | "forest" | "gold" | "ink" | "paper";
+type Fill = "orange" | "yellow" | "lime" | "forest" | "gold" | "ink" | "paper" | "outline" | "left";
 
 interface Rect {
   x: number;
@@ -25,6 +29,8 @@ const FILL_VARIABLE: Record<Fill, string> = {
   gold: "var(--color-sunflower-gold)",
   ink: "var(--color-ink)",
   paper: "var(--color-paper)",
+  outline: "var(--logo-outline)",
+  left: "var(--logo-left)",
 };
 
 /** K = outline, P = panel, N = center pentagon. 14 x 14 cells. */
@@ -90,7 +96,7 @@ function rowRects(
 }
 
 function ballRects(tone: RondoTone, originX: number, originY: number): Rect[] {
-  const outline: Fill = tone === "dark" ? "paper" : "ink";
+  const outline: Fill = tone === "auto" ? "outline" : tone === "dark" ? "paper" : "ink";
   const fillOf = (cell: string): Fill | null => {
     if (cell === "K") return outline;
     if (cell === "P") return "paper";
@@ -110,7 +116,7 @@ function markRects(tone: RondoTone): Rect[] {
     square(12, 0, 4, "orange"),
     square(24, 12, 4, "yellow"),
     square(12, 24, 4, "lime"),
-    square(0, 12, 4, tone === "dark" ? "gold" : "forest"),
+    square(0, 12, 4, tone === "auto" ? "left" : tone === "dark" ? "gold" : "forest"),
     square(5, 5, 2, "gold"),
     square(21, 5, 2, "gold"),
     square(5, 21, 2, "gold"),
@@ -120,7 +126,7 @@ function markRects(tone: RondoTone): Rect[] {
 }
 
 function wordmarkRects(tone: RondoTone): Rect[] {
-  const letterFill: Fill = tone === "dark" ? "paper" : "ink";
+  const letterFill: Fill = tone === "auto" ? "outline" : tone === "dark" ? "paper" : "ink";
   const letters = WORD.flatMap((letter, position) =>
     GLYPHS[letter].flatMap((row, index) =>
       rowRects(
@@ -136,14 +142,22 @@ function wordmarkRects(tone: RondoTone): Rect[] {
   return [...letters, ...ballRects(tone, WORD.length * LETTER_ADVANCE, 0)];
 }
 
-const MARK = { light: markRects("light"), dark: markRects("dark") } as const;
-const WORDMARK = { light: wordmarkRects("light"), dark: wordmarkRects("dark") } as const;
+const MARK = {
+  light: markRects("light"),
+  dark: markRects("dark"),
+  auto: markRects("auto"),
+} as const;
+const WORDMARK = {
+  light: wordmarkRects("light"),
+  dark: wordmarkRects("dark"),
+  auto: wordmarkRects("auto"),
+} as const;
 
 export interface RondoLogoProps extends Omit<
   SVGProps<SVGSVGElement>,
   "children" | "viewBox" | "title" | "role"
 > {
-  /** `light` for paper/white backgrounds, `dark` for ink backgrounds. */
+  /** `auto` (default) follows the theme; `light` for paper backgrounds, `dark` for ink ones. */
   tone?: RondoTone;
   /**
    * Accessible name. Pass `"Rondo"` when the logo is the only visible name; omit it when
@@ -191,11 +205,11 @@ function Logo({
 }
 
 /** Compact logo (28 x 28): avatar, favicon and square spaces. Sharp at 28, 56, 84, 112 px. */
-export function RondoMark({ tone = "light", ...props }: RondoLogoProps) {
+export function RondoMark({ tone = "auto", ...props }: RondoLogoProps) {
   return <Logo rects={MARK[tone]} viewWidth={28} viewHeight={28} {...props} />;
 }
 
 /** Extended logo (70 x 14): headers and documents. Sharp at 70, 140, 210 px wide. */
-export function RondoWordmark({ tone = "light", ...props }: RondoLogoProps) {
+export function RondoWordmark({ tone = "auto", ...props }: RondoLogoProps) {
   return <Logo rects={WORDMARK[tone]} viewWidth={70} viewHeight={14} {...props} />;
 }

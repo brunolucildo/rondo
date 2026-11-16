@@ -4,12 +4,21 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./alert": "./src/alert.tsx",
     "./brand": "./src/brand.tsx",
     "./button": "./src/button.tsx",
+    "./card": "./src/card.tsx",
+    "./field": "./src/field.tsx",
+    "./icons": "./src/icons.tsx",
     "./input": "./src/input.tsx",
     "./label": "./src/label.tsx",
     "./password-input": "./src/password-input.tsx",
+    "./pitch": "./src/pitch.tsx",
+    "./spinner": "./src/spinner.tsx",
     "./styles.css": "./src/styles.css",
+    "./theme": "./src/theme.ts",
+    "./theme-toggle": "./src/theme-toggle.tsx",
+    "./tokens.css": "./src/tokens.css",
     "./lib/utils": "./src/lib/utils.ts"
   },
   "scripts": {

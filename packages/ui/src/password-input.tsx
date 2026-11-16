@@ -1,5 +1,6 @@
 import { useId, useState } from "react";
 import { Button } from "./button";
+import { EyeIcon, EyeOffIcon } from "./icons";
 import { Input, type InputProps } from "./input";
 import { cn } from "./lib/utils";
 
@@ -9,49 +10,6 @@ export interface PasswordInputProps extends Omit<InputProps, "type"> {
    * Name each field apart when a form has more than one (for example "new password").
    */
   visibilityLabel?: string;
-}
-
-/** Pixel eye (12 x 8 cells). X = filled cell. */
-const EYE = [
-  "..XXXXXXXX..",
-  ".X........X.",
-  "X....XX....X",
-  "X...XXXX...X",
-  "X...XXXX...X",
-  "X....XX....X",
-  ".X........X.",
-  "..XXXXXXXX..",
-] as const;
-
-/** The same eye crossed by a diagonal, for the "hide" state. */
-const EYE_STRUCK = EYE.map((row, y) =>
-  row
-    .split("")
-    .map((cell, x) => (x === y + 2 || x === y + 3 ? "X" : cell))
-    .join(""),
-);
-
-function PixelEye({ struck }: { struck: boolean }) {
-  const rows = struck ? EYE_STRUCK : EYE;
-
-  return (
-    <svg
-      aria-hidden="true"
-      focusable="false"
-      viewBox="0 0 12 8"
-      shapeRendering="crispEdges"
-      fill="currentColor"
-      className="h-4 w-6"
-    >
-      {rows.flatMap((row, y) =>
-        row
-          .split("")
-          .map((cell, x) =>
-            cell === "X" ? <rect key={`${x}-${y}`} x={x} y={y} width="1" height="1" /> : null,
-          ),
-      )}
-    </svg>
-  );
 }
 
 /**
@@ -87,7 +45,7 @@ export function PasswordInput({
         onClick={() => setVisible((current) => !current)}
         className="absolute top-0 right-0 rounded-l-none bg-clip-padding"
       >
-        <PixelEye struck={visible} />
+        {visible ? <EyeOffIcon className="h-4 w-6" /> : <EyeIcon className="h-4 w-6" />}
       </Button>
     </div>
   );

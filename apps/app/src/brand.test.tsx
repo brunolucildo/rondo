@@ -127,7 +127,7 @@ describe("Rondo logo on the screens", () => {
     expect(document.querySelector("svg[aria-hidden='true']")).not.toBeNull();
   });
 
-  it("shows the compact logo on the home page, the loading state and the retry screen", async () => {
+  it("shows the extended logo in the home header, and the compact logo on the loading and retry screens", async () => {
     const decorativeMarks = () =>
       document.querySelectorAll("svg[aria-hidden='true'][viewBox='0 0 28 28']");
 
@@ -136,7 +136,9 @@ describe("Rondo logo on the screens", () => {
     renderApp("/app");
 
     expect(await screen.findByRole("heading", { level: 1, name: /Welcome/ })).toBeInTheDocument();
-    expect(decorativeMarks()).toHaveLength(1);
+    // One brand per screen: the shell header has the wordmark, so the body has no compact mark.
+    expect(screen.getByRole("img", { name: "Rondo" })).toBeInTheDocument();
+    expect(decorativeMarks()).toHaveLength(0);
 
     cleanup();
     render(<SessionLoading />);
