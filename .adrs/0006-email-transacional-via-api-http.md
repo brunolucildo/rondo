@@ -1,6 +1,6 @@
 # 0006 — E-mail transacional atrás de `EmailService`, com provedores por API HTTP
 
-- **Status:** aceito
+- **Status:** aceito; a escolha por `EMAIL_PROVIDER` foi substituída parcialmente pelo [0017](0017-provedor-de-email-por-node-env.md) (o provedor passa a sair de `NODE_ENV`; o restante segue valendo)
 - **Data:** 2026-11-09
 
 ## Contexto

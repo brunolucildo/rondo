@@ -4,7 +4,7 @@ import { validateEnvironment } from "./environment";
 const validEnv = {
   DATABASE_URL: "postgres://rondo_app:rondo@localhost:5432/rondo",
   APP_URL: "http://localhost:5173",
-  EMAIL_PROVIDER: "capture",
+  NODE_ENV: "test",
   EMAIL_FROM: "Rondo <no-reply@rondo.local>",
   AUTH_JWT_SECRET: "unit-test-jwt-secret-0123456789-abcdefghij",
 };
@@ -78,16 +78,29 @@ describe("validateEnvironment", () => {
     expect(validateEnvironment(validEnv).email).toMatchObject({ provider: "capture" });
   });
 
-  it("fails naming EMAIL_PROVIDER when it is missing", () => {
-    const { EMAIL_PROVIDER: _removed, ...withoutProvider } = validEnv;
+  it("treats a missing NODE_ENV as dev and then needs the Mailtrap credentials", () => {
+    const { NODE_ENV: _removed, ...withoutNodeEnv } = validEnv;
 
-    expect(() => validateEnvironment(withoutProvider)).toThrowError(/EMAIL_PROVIDER/);
+    expect(
+      validateEnvironment({ ...withoutNodeEnv, MAILTRAP_API_TOKEN: "t", MAILTRAP_INBOX_ID: "1" }),
+    ).toMatchObject({
+      nodeEnv: "dev",
+      email: { provider: "mailtrap" },
+    });
+    expect(() => validateEnvironment(withoutNodeEnv)).toThrowError(/MAILTRAP_/);
   });
 
-  it("refuses capture in production", () => {
-    expect(() => validateEnvironment({ ...validEnv, NODE_ENV: "production" })).toThrowError(
-      /EMAIL_PROVIDER.*production/,
-    );
+  it("exposes the normalized NODE_ENV", () => {
+    expect(validateEnvironment({ ...validEnv, NODE_ENV: " TEST " }).nodeEnv).toBe("test");
+  });
+
+  it("needs RESEND_API_KEY in production and ignores a stale EMAIL_PROVIDER", () => {
+    const production = { ...validEnv, NODE_ENV: "production", EMAIL_PROVIDER: "capture" };
+
+    expect(() => validateEnvironment(production)).toThrowError(/RESEND_API_KEY/);
+    expect(validateEnvironment({ ...production, RESEND_API_KEY: "key" }).email).toMatchObject({
+      provider: "resend",
+    });
   });
 
   it("exposes the database URL without changing it", () => {

@@ -3,7 +3,7 @@
 //   POST /api/v1/auth/{sign-up, confirm-account, sign-in, sign-out, forgot-password, reset-password,
 //                      resend-confirmation}
 //   GET  /api/v1/auth/session
-//   GET|DELETE /api/v1/test-support/emails   (so com EMAIL_PROVIDER=capture)
+//   GET|DELETE /api/v1/test-support/emails   (so com NODE_ENV=test)
 // mais rotas inexistentes (404), preflight CORS (OPTIONS) e rotas fechadas sem sessao (401).
 //
 // Nao rode este arquivo contra a API de dev: use `bun run load <perfil>`, que sobe uma API isolada

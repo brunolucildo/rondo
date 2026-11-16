@@ -1,8 +1,10 @@
-import { type EmailConfig, parseEmailConfig } from "../modules/email";
+import { type EmailConfig, parseEmailConfig, resolveNodeEnv } from "../modules/email";
 import { MIN_JWT_SECRET_LENGTH } from "./auth-secret";
 import { parseDatabaseUrl } from "./database";
 
 export interface Environment {
+  /** Effective `NODE_ENV` (trimmed, lower-cased; `dev` when absent). Picks the e-mail provider. */
+  nodeEnv: string;
   /** Postgres connection URL of the API (`rondo_app`). Never logged or put in the bundle. */
   databaseUrl: string;
   appUrl: string;
@@ -117,6 +119,7 @@ export function validateEnvironment(env: Record<string, string | undefined>): En
   }
 
   return {
+    nodeEnv: resolveNodeEnv(env),
     databaseUrl: parseDatabaseUrl(env.DATABASE_URL),
     // Presence is checked above, so the value is a string here.
     appUrl: parseAppOrigin(env.APP_URL as string),

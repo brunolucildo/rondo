@@ -1,4 +1,4 @@
-import { Inject, Module, type OnApplicationShutdown } from "@nestjs/common";
+import { Inject, Module, type OnApplicationShutdown, type OnModuleInit } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import type { Environment } from "../../config/environment";
 import { EmailService } from "./application/email.service";
@@ -54,8 +54,27 @@ import { ListCapturedEmailsRequestHandler } from "./interface/request-handlers/l
   ],
   exports: [EmailService],
 })
-export class EmailModule implements OnApplicationShutdown {
-  constructor(@Inject(EmailService) private readonly emailService: EmailService) {}
+export class EmailModule implements OnModuleInit, OnApplicationShutdown {
+  constructor(
+    @Inject(EmailService) private readonly emailService: EmailService,
+    @Inject(EMAIL_CONFIG) private readonly emailConfig: EmailConfig,
+    @Inject(ConfigService) private readonly config: ConfigService<Environment, true>,
+  ) {}
+
+  /**
+   * Says which provider `NODE_ENV` selected, so a production deploy that forgot `NODE_ENV`
+   * shows up as `dev`/`mailtrap` in the boot log. Only names, never credentials or addresses.
+   */
+  onModuleInit(): void {
+    pinoEmailLogger.info(
+      {
+        event: "email_provider_selected",
+        provider: this.emailConfig.provider,
+        nodeEnv: this.config.get("nodeEnv", { infer: true }),
+      },
+      "E-mail provider selected from NODE_ENV",
+    );
+  }
 
   /** Lets e-mails already handed to `dispatch` finish before the process exits. */
   async onApplicationShutdown(): Promise<void> {

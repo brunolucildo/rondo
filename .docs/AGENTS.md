@@ -121,7 +121,7 @@ e2e/                        # testes Playwright
 .docs/                      # documentação canônica do projeto
 .specs/                     # specs executáveis (_template.md + <slug>.md)
 .plans/                     # planos de implementação (<slug>-plan.md)
-.adrs/                      # Architecture Decision Records (0001 a 0016)
+.adrs/                      # Architecture Decision Records (0001 a 0017)
 ```
 
 `apps/docs` (site Next.js) **não é** o mesmo que `.docs/` (Markdown canônico).

@@ -203,7 +203,7 @@ const api = Bun.spawn(["node", "dist/main.js"], {
     DATABASE_URL: databaseUrl,
     API_PORT: String(PORT),
     APP_URL: "http://localhost:5173",
-    EMAIL_PROVIDER: "capture",
+    NODE_ENV: "test",
     EMAIL_FROM: "Rondo <no-reply@rondo.local>",
     TRUST_PROXY: "true",
     AUTH_JWT_SECRET: "load-test-only-secret-0123456789-abcdefghijklmnop",

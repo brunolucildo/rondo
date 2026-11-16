@@ -5,6 +5,7 @@ import request from "supertest";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { configureApp, createNestApp } from "../src/bootstrap";
 import { validateEnvironment } from "../src/config/environment";
+import { baseLogger } from "../src/observability/logger";
 import { EmailModule, EmailService, html, renderEmailLayout } from "../src/modules/email";
 import { clearCapturedEmails, getCapturedEmails } from "../src/modules/email/testing";
 
@@ -94,8 +95,9 @@ describe("capture provider and the test-support route", () => {
 });
 
 describe("the test-support route outside capture mode", () => {
-  it("answers 404 in the error envelope when the provider is mailtrap", async () => {
+  it("answers 404 in the error envelope when NODE_ENV selects mailtrap", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch");
+    const logSpy = vi.spyOn(baseLogger, "info");
     const moduleRef = await Test.createTestingModule({
       imports: [
         ConfigModule.forRoot({
@@ -104,7 +106,7 @@ describe("the test-support route outside capture mode", () => {
           validate: () =>
             validateEnvironment({
               ...baseEnv,
-              EMAIL_PROVIDER: "mailtrap",
+              NODE_ENV: "dev",
               EMAIL_FROM: "no-reply@rondo.local",
               MAILTRAP_API_TOKEN: "test-token",
               MAILTRAP_INBOX_ID: "1",
@@ -123,9 +125,15 @@ describe("the test-support route outside capture mode", () => {
       expect(response.status).toBe(404);
       expect(response.body.error.code).toBe("NOT_FOUND");
       expect(fetchSpy).not.toHaveBeenCalled();
+      // The boot log names the provider and NODE_ENV, and nothing else about the configuration.
+      expect(logSpy).toHaveBeenCalledWith(
+        { event: "email_provider_selected", provider: "mailtrap", nodeEnv: "dev" },
+        expect.any(String),
+      );
     } finally {
       await app.close();
       fetchSpy.mockRestore();
+      logSpy.mockRestore();
     }
   });
 });
@@ -136,10 +144,12 @@ describe("boot validation", () => {
     vi.resetModules();
   });
 
-  it("refuses to start with EMAIL_PROVIDER=capture in production", async () => {
+  it("refuses to start in production without RESEND_API_KEY, even with a stale EMAIL_PROVIDER", async () => {
     // ConfigModule validates when AppModule is evaluated, so load it afresh.
     vi.resetModules();
     vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("EMAIL_PROVIDER", "capture");
+    vi.stubEnv("RESEND_API_KEY", "");
 
     const boot = async () => {
       const { AppModule: FreshAppModule } = await import("../src/app.module.js");
@@ -148,6 +158,6 @@ describe("boot validation", () => {
       await moduleRef.init();
     };
 
-    await expect(boot()).rejects.toThrowError(/EMAIL_PROVIDER/);
+    await expect(boot()).rejects.toThrowError(/RESEND_API_KEY/);
   });
 });
