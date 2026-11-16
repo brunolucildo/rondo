@@ -48,7 +48,7 @@ export default defineConfig({
       env: { VITE_API_URL: API_URL },
     },
     {
-      // Always a fresh API: the tests need EMAIL_PROVIDER=capture and a clean
+      // Always a fresh API: the tests need NODE_ENV=test (e-mail captured in memory) and a clean
       // in-memory rate limit, which an API already running for development lacks.
       command: "bun run dev",
       cwd: "apps/api",
@@ -60,7 +60,7 @@ export default defineConfig({
         APP_URL,
         DATABASE_URL: process.env.DATABASE_URL as string,
         AUTH_JWT_SECRET: process.env.AUTH_JWT_SECRET as string,
-        EMAIL_PROVIDER: "capture",
+        NODE_ENV: "test",
         EMAIL_FROM: "Rondo <no-reply@rondo.local>",
         TRUST_PROXY: "false",
         OTEL_SDK_DISABLED: "true",

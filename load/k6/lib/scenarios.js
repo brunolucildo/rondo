@@ -334,7 +334,7 @@ export function edges() {
   }
 }
 
-/** Le a caixa de e-mails capturados (so existe com EMAIL_PROVIDER=capture). */
+/** Le a caixa de e-mails capturados (so existe com NODE_ENV=test). */
 export function testSupport() {
   expectStatus(
     call("GET", "/test-support/emails", { endpoint: "test-support-list", expected: [200] }),
