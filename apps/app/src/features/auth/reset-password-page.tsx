@@ -1,8 +1,19 @@
 import { Link, useRouter, useSearch } from "@tanstack/react-router";
+import { Alert } from "@repo/ui/alert";
 import { Button } from "@repo/ui/button";
-import { Label } from "@repo/ui/label";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@repo/ui/card";
+import { Field } from "@repo/ui/field";
 import { PasswordInput } from "@repo/ui/password-input";
+import { Spinner } from "@repo/ui/spinner";
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
+import { AUTH_LINK_CLASS } from "./auth-styles";
 import { describeResetPasswordFailure } from "./describe-reset-password-failure";
 import {
   EMPTY_RESET_PASSWORD_VALUES,
@@ -24,10 +35,6 @@ const FIELDS: Record<ResetPasswordField, FieldConfig> = {
   confirmPassword: { label: "Confirm new password", visibilityLabel: "password confirmation" },
 };
 
-const CARD_CLASS = "border-2 border-border bg-card p-6 shadow-[4px_4px_0_0_var(--color-border)]";
-const LINK_CLASS =
-  "inline-flex min-h-11 items-center font-bold underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
-
 function focusField(name: ResetPasswordField) {
   document.getElementById(`reset-password-${name}`)?.focus();
 }
@@ -36,34 +43,19 @@ function firstInvalid(errors: ResetPasswordErrors): ResetPasswordField | undefin
   return RESET_PASSWORD_FIELDS.find((name) => errors[name] !== undefined);
 }
 
-function Spinner() {
-  return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="3"
-      className="animate-spin motion-reduce:animate-none"
-    >
-      <path d="M12 3a9 9 0 1 0 9 9" />
-    </svg>
-  );
-}
-
 function InvalidLink() {
   return (
-    <section className={CARD_CLASS}>
-      <h1 className="text-3xl font-black tracking-tight">This link is invalid or has expired</h1>
-      <p className="mt-2 text-base text-muted-foreground">
-        Reset links work once and expire after 1 hour.
-      </p>
-      <p className="mt-6 text-base">
-        <Link to="/auth/forgot-password" className={LINK_CLASS}>
+    <Card>
+      <CardHeader>
+        <CardTitle as="h1">This link is invalid or has expired</CardTitle>
+        <CardDescription>Reset links work once and expire after 1 hour.</CardDescription>
+      </CardHeader>
+      <CardFooter>
+        <Link to="/auth/forgot-password" className={AUTH_LINK_CLASS}>
           Request a new reset link
         </Link>
-      </p>
-    </section>
+      </CardFooter>
+    </Card>
   );
 }
 
@@ -110,12 +102,14 @@ export function ResetPasswordPage() {
 
   if (isSuccess) {
     return (
-      <section className={CARD_CLASS}>
-        <h1 className="text-3xl font-black tracking-tight">Choose a new password</h1>
-        <p role="status" className="mt-4 text-base font-bold">
-          Password updated. Taking you to sign in…
-        </p>
-      </section>
+      <Card>
+        <CardHeader>
+          <CardTitle as="h1">Choose a new password</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Alert variant="success">Password updated. Taking you to sign in…</Alert>
+        </CardContent>
+      </Card>
     );
   }
 
@@ -177,71 +171,63 @@ export function ResetPasswordPage() {
   }
 
   function renderField(name: ResetPasswordField) {
-    const inputId = `reset-password-${name}`;
-    const errorId = `${inputId}-error`;
-    const error = visibleError(name);
-
     return (
-      <div key={name} className="space-y-2">
-        <Label htmlFor={inputId}>{FIELDS[name].label}</Label>
-        <PasswordInput
-          id={inputId}
-          name={name}
-          visibilityLabel={FIELDS[name].visibilityLabel}
-          autoComplete="new-password"
-          value={values[name]}
-          onChange={handleChange}
-          readOnly={pending}
-          aria-invalid={error ? true : undefined}
-          aria-describedby={error ? errorId : undefined}
-          required
-        />
-        {error ? (
-          <p id={errorId} className="text-base font-bold text-destructive">
-            {error}
-          </p>
-        ) : null}
-      </div>
+      <Field
+        key={name}
+        id={`reset-password-${name}`}
+        label={FIELDS[name].label}
+        error={visibleError(name)}
+      >
+        {(control) => (
+          <PasswordInput
+            {...control}
+            name={name}
+            visibilityLabel={FIELDS[name].visibilityLabel}
+            autoComplete="new-password"
+            value={values[name]}
+            onChange={handleChange}
+            readOnly={pending}
+            required
+          />
+        )}
+      </Field>
     );
   }
 
   return (
-    <section className={CARD_CLASS}>
-      <h1 className="text-3xl font-black tracking-tight">Choose a new password</h1>
-      <p className="mt-2 text-base text-muted-foreground">
-        Use 8 to 128 characters. We will sign you out everywhere once it is changed.
-      </p>
+    <Card>
+      <CardHeader>
+        <CardTitle as="h1">Choose a new password</CardTitle>
+        <CardDescription>
+          Use 8 to 128 characters. We will sign you out everywhere once it is changed.
+        </CardDescription>
+      </CardHeader>
 
-      <form noValidate onSubmit={handleSubmit} className="mt-6 space-y-5">
-        {generalError ? (
-          <p
-            role="alert"
-            className="border-2 border-destructive bg-background p-3 text-base font-bold text-destructive"
-          >
-            {generalError}
-          </p>
-        ) : null}
+      <CardContent>
+        <form noValidate onSubmit={handleSubmit} className="space-y-5">
+          {generalError ? <Alert variant="error">{generalError}</Alert> : null}
 
-        {renderField("password")}
-        {renderField("confirmPassword")}
+          {renderField("password")}
+          {renderField("confirmPassword")}
 
-        <Button type="submit" size="lg" className="w-full" disabled={pending} aria-busy={pending}>
-          {pending ? (
-            <>
-              <Spinner />
-              Resetting…
-            </>
-          ) : (
-            "Reset password"
-          )}
-        </Button>
-      </form>
+          <Button type="submit" size="lg" className="w-full" disabled={pending} aria-busy={pending}>
+            {pending ? (
+              <>
+                <Spinner />
+                Resetting…
+              </>
+            ) : (
+              "Reset password"
+            )}
+          </Button>
+        </form>
+      </CardContent>
 
-      <p className="mt-6 text-base">
-        <Link to="/auth/sign-in" className={LINK_CLASS}>
+      <CardFooter>
+        <Link to="/auth/sign-in" className={AUTH_LINK_CLASS}>
           Back to sign in
         </Link>
-      </p>
-    </section>
+      </CardFooter>
+    </Card>
   );
 }

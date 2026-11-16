@@ -1,5 +1,7 @@
 import { RondoMark } from "@repo/ui/brand";
 import { Button } from "@repo/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@repo/ui/card";
+import { Spinner } from "@repo/ui/spinner";
 
 /** Shown while `GET /auth/session` runs. A live region, so assistive tech announces it. */
 export function SessionLoading() {
@@ -10,16 +12,7 @@ export function SessionLoading() {
     >
       <RondoMark className="size-14" />
       <div className="flex items-center gap-3">
-        <svg
-          aria-hidden="true"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="3"
-          className="size-6 animate-spin motion-reduce:animate-none"
-        >
-          <path d="M12 3a9 9 0 1 0 9 9" />
-        </svg>
+        <Spinner />
         <span className="text-base font-bold">Verifying your session…</span>
       </div>
     </div>
@@ -29,15 +22,21 @@ export function SessionLoading() {
 /** The session could not be checked (network or server failure); the token is kept. */
 export function SessionError({ onRetry }: { onRetry: () => void }) {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-6 px-6 text-center">
+    <main className="flex min-h-screen flex-col items-center justify-center gap-6 px-6">
       <RondoMark className="size-14" />
-      <h1 className="text-3xl font-black tracking-tight sm:text-4xl">
-        We couldn&apos;t verify your session.
-      </h1>
-      <p className="max-w-md text-muted-foreground">
-        Check your connection and try again. You are not signed out.
-      </p>
-      <Button onClick={onRetry}>Try again</Button>
+      <Card className="w-full max-w-md">
+        <CardHeader>
+          <CardTitle as="h1">We couldn&apos;t verify your session.</CardTitle>
+          <CardDescription>
+            Check your connection and try again. You are not signed out.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button size="lg" onClick={onRetry}>
+            Try again
+          </Button>
+        </CardContent>
+      </Card>
     </main>
   );
 }

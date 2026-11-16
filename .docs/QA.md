@@ -17,24 +17,24 @@
 | Cobertura                   | `bun run test:coverage` gera `coverage/`; sem threshold                                                                                                                                         |
 | Hooks de pre-commit         | Configurados (`lefthook.yml`); validados no commit raiz `227e0ad`                                                                                                                               |
 | CI                          | Não configurado                                                                                                                                                                                 |
-| Acessibilidade automatizada | Não configurada                                                                                                                                                                                 |
+| Acessibilidade automatizada | `axe` no E2E (`e2e/a11y.spec.ts`: 12 telas × 2 temas, sem violação `serious`/`critical`); escrito na spec `0018`, executado pelo usuário com `bun run test:e2e`                                 |
 
 ### 1.1 Baseline verificado em 2026-11-07
 
-| Gate                       | Resultado | Observação                                                                 |
-| -------------------------- | --------- | -------------------------------------------------------------------------- |
-| `bun run lint`             | Passa     | 4 tasks, 0 warnings, 0 erros                                               |
-| `bun run check-types`      | Passa     | 4 tasks                                                                    |
-| `bun run build`            | Passa     | `app`, `api` e `docs`                                                      |
-| `bun run test`             | Passa     | Vitest em `app` e `api`                                                    |
-| `bun run test:integration` | Passa     | 1 teste (Supertest em `GET /`)                                             |
-| `bun run test:e2e`         | Passa     | 1 teste (Chromium); sobe o `apps/app` sozinho                              |
-| `bun run test:coverage`    | Passa     | Gera `coverage/api` e `coverage/app`                                       |
-| `bun run format` (2×)      | Passa     | Segunda execução sem diff                                                  |
-| `bun run code:fix`         | Passa     | OXLint `--fix` + OXFmt                                                     |
-| `bun run infra:up`         | Passa     | Banco local (stack anterior à spec 0016) em 54321; Grafana, Loki, Tempo, Mimir e Collector `healthy`       |
-| `bun run db:migrate`       | Passa     | Sem migrations: a CLI aplica `[]` e o script informa que não há pendências |
-| `bun run infra:down` (2×)  | Passa     | Idempotente; nenhum container do projeto fica                              |
+| Gate                       | Resultado | Observação                                                                                           |
+| -------------------------- | --------- | ---------------------------------------------------------------------------------------------------- |
+| `bun run lint`             | Passa     | 4 tasks, 0 warnings, 0 erros                                                                         |
+| `bun run check-types`      | Passa     | 4 tasks                                                                                              |
+| `bun run build`            | Passa     | `app`, `api` e `docs`                                                                                |
+| `bun run test`             | Passa     | Vitest em `app` e `api`                                                                              |
+| `bun run test:integration` | Passa     | 1 teste (Supertest em `GET /`)                                                                       |
+| `bun run test:e2e`         | Passa     | 1 teste (Chromium); sobe o `apps/app` sozinho                                                        |
+| `bun run test:coverage`    | Passa     | Gera `coverage/api` e `coverage/app`                                                                 |
+| `bun run format` (2×)      | Passa     | Segunda execução sem diff                                                                            |
+| `bun run code:fix`         | Passa     | OXLint `--fix` + OXFmt                                                                               |
+| `bun run infra:up`         | Passa     | Banco local (stack anterior à spec 0016) em 54321; Grafana, Loki, Tempo, Mimir e Collector `healthy` |
+| `bun run db:migrate`       | Passa     | Sem migrations: a CLI aplica `[]` e o script informa que não há pendências                           |
+| `bun run infra:down` (2×)  | Passa     | Idempotente; nenhum container do projeto fica                                                        |
 
 Observabilidade verificada: `GET /` gera um trace consultável no Tempo (por `trace_id`) e um log no Loki com o atributo `requestId`, sem headers, IP ou query string; com o Collector parado, `GET /` continua 200.
 
@@ -164,12 +164,12 @@ Verificação manual de UI (`/auth/confirm-account` e `/auth/resend-confirmation
 
 ## 2. Pré-requisitos
 
-| Item                   | Como obter                                                                                                               |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| Bun 1.4.4 e Node >= 24 | Instalação local                                                                                                         |
-| Docker em execução     | Necessário para `infra:up`, `db:migrate`, `test:integration` e `test:e2e`; lint, tipos, build e `test` não dependem dele |
-| Postgres local             | Docker (`bun run infra:up`); a imagem `postgres:17-alpine` é baixada na primeira vez                                     |
-| Browsers do Playwright | `bunx playwright install` (uma vez)                                                                                      |
+| Item                   | Como obter                                                                                                                                                    |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Bun 1.4.4 e Node >= 24 | Instalação local                                                                                                                                              |
+| Docker em execução     | Necessário para `infra:up`, `db:migrate`, `test:integration` e `test:e2e`; lint, tipos, build e `test` não dependem dele                                      |
+| Postgres local         | Docker (`bun run infra:up`); a imagem `postgres:17-alpine` é baixada na primeira vez                                                                          |
+| Browsers do Playwright | `bunx playwright install` (uma vez)                                                                                                                           |
 | `.env` na raiz         | Copie `.env.example`; `DATABASE_URL` e `DATABASE_MIGRATOR_URL` já apontam para o Postgres local (`rondo`/`rondo`, credenciais públicas só de desenvolvimento) |
 
 A API **não sobe** sem `DATABASE_URL` (falha com exit 1 e mensagem acionável, sem ecoar o valor) e `db:migrate` exige `DATABASE_MIGRATOR_URL`. Se a porta 5432 estiver ocupada por outro Postgres, pare-o ou ajuste a porta no Compose e nas duas URLs. Os testes usam o banco local por padrão (`apps/api/test/setup-env.ts` e `playwright.config.ts` só definem `DATABASE_URL` se o ambiente não trouxer uma): **nunca** exporte uma `DATABASE_URL` de banco hospedado ao rodar `test:integration` ou `test:e2e`, porque a semeadura e a limpeza são feitas por SQL. `infra:reset` só apaga o volume Docker local.
@@ -191,16 +191,16 @@ Execute na raiz do repositório, na ordem abaixo:
 
 Outros comandos:
 
-| Comando                 | Efeito                                                                                |
-| ----------------------- | ------------------------------------------------------------------------------------- |
-| `bun run test:coverage` | Vitest com cobertura em `coverage/` (sem threshold nesta fase)                        |
-| `bun run format`        | OXFmt escreve nos arquivos; escopo limitado por `.oxfmtrc.json`                       |
-| `bun run code:fix`      | `oxlint --fix` e `oxfmt --write`                                                      |
-| `bun run infra:up`      | `docker compose up -d --build --wait` (até 300 s): Postgres e LGTM; sai != 0 se algo falhar e mantém o que subiu |
-| `bun run infra:down`    | `docker compose down`; preserva o volume `postgres-data`; idempotente                 |
-| `bun run infra:reset`   | `docker compose down -v` + `infra:up`: **apaga** o volume do Postgres local e avisa; rode `db:migrate` depois |
+| Comando                 | Efeito                                                                                                                                             |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bun run test:coverage` | Vitest com cobertura em `coverage/` (sem threshold nesta fase)                                                                                     |
+| `bun run format`        | OXFmt escreve nos arquivos; escopo limitado por `.oxfmtrc.json`                                                                                    |
+| `bun run code:fix`      | `oxlint --fix` e `oxfmt --write`                                                                                                                   |
+| `bun run infra:up`      | `docker compose up -d --build --wait` (até 300 s): Postgres e LGTM; sai != 0 se algo falhar e mantém o que subiu                                   |
+| `bun run infra:down`    | `docker compose down`; preserva o volume `postgres-data`; idempotente                                                                              |
+| `bun run infra:reset`   | `docker compose down -v` + `infra:up`: **apaga** o volume do Postgres local e avisa; rode `db:migrate` depois                                      |
 | `bun run db:migrate`    | Runner próprio (`scripts/db-migrate.ts`): aplica `db/migrations` em ordem, uma transação por arquivo, checksum em `schema_migrations`; idempotente |
-| `bun run hooks:install` | `lefthook install` (grava `.git/hooks`; rode uma vez em cada clone)                   |
+| `bun run hooks:install` | `lefthook install` (grava `.git/hooks`; rode uma vez em cada clone)                                                                                |
 
 `bun run lint` cobre apenas os workspaces. `scripts/` e `e2e/` na raiz passam por `bun run code:fix` e por lint-staged, mas não pelo `lint` do Turbo.
 
@@ -296,7 +296,8 @@ Aplique apenas o que a mudança afeta, mas registre o que foi verificado.
 
 ### 5.2 UI e responsividade
 
-- [ ] 375px (mobile), 768px (tablet) e 1280px (desktop).
+- [ ] 320px, 375px (mobile), 768px (tablet) e 1280px (desktop), nos temas claro e escuro.
+- [ ] Mudança visual: `node scripts/capture-screenshots.mjs --phase before|after` com `.screenshots/README.md` atualizado (um par por tela, mesma dimensão, só dados fictícios).
 - [ ] Sem scroll horizontal inesperado.
 - [ ] Conteúdo não cortado, sobreposto ou ilegível.
 - [ ] Estados de hover, focus, active, disabled, loading e erro revisados.
@@ -330,16 +331,16 @@ Aplique apenas o que a mudança afeta, mas registre o que foi verificado.
 
 ## 6. Dívidas de QA conhecidas
 
-| #   | Problema                                                                          | Impacto                                                 |
-| --- | --------------------------------------------------------------------------------- | ------------------------------------------------------- |
-| 1   | Sem CI                                                                            | Gates dependem de execução manual                       |
-| 2   | Hooks só validados no commit raiz, sem teste automatizado                         | `lefthook`/`lint-staged` não comprovados                |
-| 3   | `lint` do Turbo não cobre `scripts/` e `e2e/`                                     | Erros nesses arquivos passam no gate                    |
-| 4   | Sem verificação de acessibilidade automatizada                                    | Regressões de a11y só aparecem na revisão manual        |
-| 5   | Leitor de tela, hover/disabled/loading e `prefers-reduced-motion` não verificados | Cobertura parcial de a11y (ver §1.2)                    |
-| 6   | `Button` usa `text-sm` (14px) e transições sem variante `motion-reduce`           | Fora de `DESIGN.md` §3 e §6 para o rótulo e o movimento |
-| 7   | Cobertura sem threshold                                 | Código sem teste não é sinalizado                       |
-| 8   | Imagens LGTM em `:latest`                                                         | Reprodutibilidade da infra local                        |
+| #   | Problema                                                                                                                                                  | Impacto                                                                                                   |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| 1   | Sem CI                                                                                                                                                    | Gates dependem de execução manual                                                                         |
+| 2   | Hooks só validados no commit raiz, sem teste automatizado                                                                                                 | `lefthook`/`lint-staged` não comprovados                                                                  |
+| 3   | `lint` do Turbo não cobre `scripts/` e `e2e/`                                                                                                             | Erros nesses arquivos passam no gate                                                                      |
+| 4   | O `axe` só roda no E2E (`bun run test:e2e`, que exige o Postgres local)                                                                                   | Sem CI, regressões de a11y dependem de alguém rodar                                                       |
+| 5   | Leitor de tela não verificado (hover/disabled e `prefers-reduced-motion` foram na spec `0018`)                                                            | Cobertura parcial de a11y (ver §1.11)                                                                     |
+| 6   | `apps/api`: 3 testes de `session.service.spec.ts` falham desde 2026-11-16 (data fixa `2026-11-09` + TTL de 7 dias contra o relógio real do assinador JWT) | `bun run test` falha no `api`; sem relação com a UI; corrigir o teste para injetar o relógio no assinador |
+| 7   | Cobertura sem threshold                                                                                                                                   | Código sem teste não é sinalizado                                                                         |
+| 8   | Imagens LGTM em `:latest`                                                                                                                                 | Reprodutibilidade da infra local                                                                          |
 
 ## 7. Template de evidência
 
@@ -463,15 +464,15 @@ Verificação manual com o SDK ligado (API compilada em `node dist/main.js`, `AP
 
 Executado na árvore principal, no Windows, com Docker. O Postgres novo subiu na 5432 (`rondo-postgres-1`, `healthy`); os containers antigos da stack anterior continuavam rodando em outras portas e não foram tocados. A primeira `bun run infra:up` **saiu com erro**: a porta 3200 (Tempo) estava ocupada por um `next start -p 3200` alheio ao projeto, e Grafana, Tempo e Collector não subiram. Com a autorização do Owner o processo foi encerrado e a segunda execução subiu os 6 containers (`postgres`, Loki, Mimir, Tempo, Grafana e Collector), todos `healthy`.
 
-| Gate                       | Resultado                  | Observação                                                                                                                                 |
-| -------------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `bun run lint`             | Passa                      | 4 tasks, 0 warnings, 0 erros                                                                                                               |
-| `bun run check-types`      | Passa                      | 4 tasks                                                                                                                                    |
-| `bun run build`            | Passa                      | `app`, `api` e `docs`                                                                                                                      |
-| `bun run test`             | Passa                      | `api`: 464 testes (57 arquivos; novo teste em `grafana-assets.spec.ts` contra referências a banco de terceiros); `app`: 226 testes         |
-| `bun run db:migrate` (2×)  | Passa                      | 1ª aplica as 5 migrations; 2ª "Nada a aplicar: 5 migration(s) já registrada(s)"                                                            |
-| `bun run test:integration` | Passa                      | 212 testes (15 arquivos) contra o Postgres local; tabelas `users`, `auth_tokens` e `sessions` ficaram com 0 linhas depois                  |
-| `bun run test:e2e`         | **Não executado**          | O classificador de permissões da sessão bloqueou o comando; não foi contornado. Precisa rodar em outra sessão, com as portas 5173/3002 livres |
+| Gate                       | Resultado         | Observação                                                                                                                                    |
+| -------------------------- | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bun run lint`             | Passa             | 4 tasks, 0 warnings, 0 erros                                                                                                                  |
+| `bun run check-types`      | Passa             | 4 tasks                                                                                                                                       |
+| `bun run build`            | Passa             | `app`, `api` e `docs`                                                                                                                         |
+| `bun run test`             | Passa             | `api`: 464 testes (57 arquivos; novo teste em `grafana-assets.spec.ts` contra referências a banco de terceiros); `app`: 226 testes            |
+| `bun run db:migrate` (2×)  | Passa             | 1ª aplica as 5 migrations; 2ª "Nada a aplicar: 5 migration(s) já registrada(s)"                                                               |
+| `bun run test:integration` | Passa             | 212 testes (15 arquivos) contra o Postgres local; tabelas `users`, `auth_tokens` e `sessions` ficaram com 0 linhas depois                     |
+| `bun run test:e2e`         | **Não executado** | O classificador de permissões da sessão bloqueou o comando; não foi contornado. Precisa rodar em outra sessão, com as portas 5173/3002 livres |
 
 **Banco e privilégios (R2, R5):** só existem `rondo_app` e `rondo_migrator`; não existem `anon`, `authenticated` nem `service_role`. Como `rondo_app`, `CREATE TABLE`, `ALTER TABLE users` e `DROP TABLE users` falham com `42501`; `select` nas três tabelas e `auth_confirm_account` funcionam; há 6 `EXECUTE` em funções `auth_*` para `rondo_app` e nenhuma para `public`. `pg_monitor` dá acesso a `pg_stat_database` e `pg_stat_user_tables`, e `rondo_app` **não** lê `pg_authid`.
 
@@ -491,16 +492,42 @@ Executado na árvore principal, no Windows, com Docker. O Postgres novo subiu na
 
 Executado na árvore principal, no Windows. O Postgres local (`rondo-postgres-1`) já estava `healthy` na 5432; os outros dois containers de Postgres da máquina usam as portas 5433 e 5434 e não foram tocados.
 
-| Gate                       | Resultado             | Observação                                                                                                                                                                                                 |
-| -------------------------- | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `bun run lint`             | Passa                 | 4 tasks, 0 warnings, 0 erros                                                                                                                                                                               |
-| `bun run check-types`      | Passa                 | 4 tasks                                                                                                                                                                                                    |
-| `bun run build`            | Passa                 | `app`, `api` e `docs`                                                                                                                                                                                      |
-| `bun run test` (`app`)     | Passa                 | 227 testes (23 arquivos)                                                                                                                                                                                   |
+| Gate                       | Resultado                    | Observação                                                                                                                                                                                                                                                                                                          |
+| -------------------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bun run lint`             | Passa                        | 4 tasks, 0 warnings, 0 erros                                                                                                                                                                                                                                                                                        |
+| `bun run check-types`      | Passa                        | 4 tasks                                                                                                                                                                                                                                                                                                             |
+| `bun run build`            | Passa                        | `app`, `api` e `docs`                                                                                                                                                                                                                                                                                               |
+| `bun run test` (`app`)     | Passa                        | 227 testes (23 arquivos)                                                                                                                                                                                                                                                                                            |
 | `bun run test` (`api`)     | **3 falhas, fora do escopo** | 476 de 479 passam. As 3 falhas são de `session.service.spec.ts` e **também ocorrem na árvore sem as mudanças da 0017** (verificado com `git stash`): o `NOW` fixo de 2026-11-09 mais o TTL de 7 dias vence em 2026-11-16 12:00Z e a verificação do JWT usa o relógio real. Dívida pré-existente, não corrigida aqui |
-| `bun run test:integration` | Passa                 | 212 testes (15 arquivos) contra o Postgres local, com `NODE_ENV=test` vindo do Vitest                                                                                                                      |
-| `bun run test:e2e`         | **Não executado**     | As portas 5173 e 3002 estavam ocupadas por processos do usuário e uma verificação anterior (1.14) teve o comando bloqueado pelo classificador de permissões; não foi contornado. Precisa rodar com as portas livres |
+| `bun run test:integration` | Passa                        | 212 testes (15 arquivos) contra o Postgres local, com `NODE_ENV=test` vindo do Vitest                                                                                                                                                                                                                               |
+| `bun run test:e2e`         | **Não executado**            | As portas 5173 e 3002 estavam ocupadas por processos do usuário e uma verificação anterior (1.14) teve o comando bloqueado pelo classificador de permissões; não foi contornado. Precisa rodar com as portas livres                                                                                                 |
 
 **Verificação manual (R1, R2, R5, R6, R9):** com a API compilada (`node dist/main.js`, porta 3022, `DATABASE_URL` local explícita, `OTEL_SDK_DISABLED=true`) e `EMAIL_PROVIDER` herdada de propósito: `NODE_ENV=test` sobe, loga `email_provider_selected` com `provider=capture`, `nodeEnv=test` e `GET /api/v1/test-support/emails` responde 200; sem `NODE_ENV` e com `MAILTRAP_*` falsas sobe como `dev`/`mailtrap` e a rota responde 404; sem `NODE_ENV` e sem credencial do Mailtrap sai com erro citando `MAILTRAP_INBOX_ID` e `NODE_ENV is "dev"`; `production` sem `RESEND_API_KEY` sai com erro citando `RESEND_API_KEY`; `production` com chave falsa sobe como `resend` e a rota responde 404, mesmo com `EMAIL_PROVIDER=capture` no ambiente. Nenhum e-mail foi enviado a Mailtrap ou Resend.
 
 **Não verificado:** `test:e2e`; envio real pelo Mailtrap e pelo Resend (sem credenciais, como na spec 0002).
+
+### 1.11 Verificação da spec 0018 (redesign retro 8-bit) em 2026-11-16
+
+Executado na raiz, com os servidores de desenvolvimento de `apps/app` (5173) e `apps/docs` (3001) e a API interceptada no navegador (sem banco, sem `DATABASE_URL`).
+
+| Gate                  | Resultado                                           | Observação                                                                                                                                                                                                      |
+| --------------------- | --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bun run lint`        | Passa                                               | 4 tasks, 0 warnings, 0 erros                                                                                                                                                                                    |
+| `bun run check-types` | Passa                                               | 4 tasks                                                                                                                                                                                                         |
+| `bun run build`       | Passa                                               | `app`, `api` e `docs`; o `docs` compila com Tailwind v4 e `@repo/ui`; fontes `.woff2` emitidas em `apps/app/dist/assets` (65 KB no total)                                                                       |
+| `bun run test`        | `app` passa; `api` falha em 3 testes pré-existentes | `app`: 317 testes (26 arquivos; novos: `ui/primitives`, `ui/theme`, `ui/theme-contrast`); `api`: 476 passam e 3 de `session.service.spec.ts` falham por data fixa (dívida §6 #6, `apps/api` não foi alterado)   |
+| `bun run test:e2e`    | Não rodou                                           | Pedido ao usuário (spec §7.9). O `e2e/a11y.spec.ts` novo foi executado à parte, com uma configuração temporária fora do repositório contra o servidor de desenvolvimento e a API interceptada: 24 testes passam |
+
+Verificação manual de UI (Chromium via Playwright, `apps/app` em dev, API interceptada, scripts descartados depois do uso):
+
+- 320 / 375 / 768 px em `/auth/*` (6 telas) e 404, nos temas claro e escuro: `scrollWidth` = largura da viewport (sem rolagem horizontal), um único `h1`, nenhum link, botão ou campo menor que 44 px, fonte pixel sempre >= 16 px.
+- Rede: nenhuma requisição fora de `localhost` (sem CDN de fontes); Press Start 2P, Geist e Geist Mono carregadas (`document.fonts`).
+- Console sem erro nas telas de auth e no 404.
+- `prefers-reduced-motion: reduce`: 0 animações infinitas na tela "Verifying your session…"; sem a preferência, 1 (a bola).
+- Teclado em `/auth/sign-in`: Tab passa por "Dark theme", e-mail, senha, "Show password", "Sign in" e "Forgot your password?", todos com anel de foco.
+- Contraste: 44 pares (22 por tema) calculados dos tokens, todos acima do mínimo (`DESIGN.md` §2.5); o teste `apps/app/src/ui/theme-contrast.test.ts` repete o cálculo.
+- Screenshots: `.screenshots/` com 24 pares `_before`/`_after` de mesma dimensão, 5 pares `-mobile` e 5 `-dark_after` (`README.md` descreve o método e cada par).
+
+Achado do `web-design-guidelines` (regras da Vercel buscadas em 2026-11-16) e correções: `spellCheck={false}` nos campos de e-mail (corrigido); `touch-action: manipulation` no `Button` (corrigido); `transition: all` ausente e transição do `Button` reduzida a `transform` (corrigido). Não aplicados, com motivo: `<meta name="theme-color">` (exigiria hex fora dos primitivos, `DESIGN.md` §10), `preload` das fontes (nomes com hash do bundler; `font-display: swap` cobre) e Title Case nos botões (textos funcionais existentes não mudam, spec §8).
+
+**Não verificado:** leitor de tela; `bun run test:e2e` completo; screenshots do estado "enviando" (a bola em movimento); Safari e Firefox.

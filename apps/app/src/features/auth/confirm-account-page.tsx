@@ -1,47 +1,39 @@
 import { Link, useSearch } from "@tanstack/react-router";
+import { Alert } from "@repo/ui/alert";
 import { Button } from "@repo/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@repo/ui/card";
+import { Spinner } from "@repo/ui/spinner";
 import { useEffect, useRef } from "react";
 import { ApiError } from "../../lib/api-client";
+import { AUTH_LINK_CLASS } from "./auth-styles";
 import { useConfirmAccount } from "./use-confirm-account";
 import { useRedirect } from "./use-redirect";
-
-const CARD_CLASS = "border-2 border-border bg-card p-6 shadow-[4px_4px_0_0_var(--color-border)]";
-const LINK_CLASS =
-  "inline-flex min-h-11 items-center font-bold underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 
 /** Any answer that says "this token will never work" (the API does not say which reason). */
 function isDeadLink(error: unknown): boolean {
   return error instanceof ApiError && error.status === 400;
 }
 
-function Spinner() {
-  return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="3"
-      className="size-6 animate-spin motion-reduce:animate-none"
-    >
-      <path d="M12 3a9 9 0 1 0 9 9" />
-    </svg>
-  );
-}
-
 function InvalidLink() {
   return (
-    <section className={CARD_CLASS}>
-      <h1 className="text-3xl font-black tracking-tight">This link is invalid or has expired</h1>
-      <p className="mt-2 text-base text-muted-foreground">
-        Confirmation links work once and expire after 24 hours.
-      </p>
-      <p className="mt-6 text-base">
-        <Link to="/auth/resend-confirmation" className={LINK_CLASS}>
+    <Card>
+      <CardHeader>
+        <CardTitle as="h1">This link is invalid or has expired</CardTitle>
+        <CardDescription>Confirmation links work once and expire after 24 hours.</CardDescription>
+      </CardHeader>
+      <CardFooter>
+        <Link to="/auth/resend-confirmation" className={AUTH_LINK_CLASS}>
           Request a new confirmation email
         </Link>
-      </p>
-    </section>
+      </CardFooter>
+    </Card>
   );
 }
 
@@ -75,31 +67,35 @@ export function ConfirmAccountPage() {
     const tooMany = confirm.error instanceof ApiError && confirm.error.status === 429;
 
     return (
-      <section className={CARD_CLASS}>
-        <h1 className="text-3xl font-black tracking-tight">
-          We couldn&apos;t confirm your account
-        </h1>
-        <p role="alert" className="mt-2 text-base text-muted-foreground">
-          {tooMany
-            ? "Too many attempts. Try again in a few minutes."
-            : "Check your connection and try again."}
-        </p>
-        <div className="mt-6">
+      <Card>
+        <CardHeader>
+          <CardTitle as="h1">We couldn&apos;t confirm your account</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          <Alert variant="error">
+            {tooMany
+              ? "Too many attempts. Try again in a few minutes."
+              : "Check your connection and try again."}
+          </Alert>
           <Button size="lg" onClick={() => mutate(token)}>
             Try again
           </Button>
-        </div>
-      </section>
+        </CardContent>
+      </Card>
     );
   }
 
   return (
-    <section className={CARD_CLASS}>
-      <h1 className="text-3xl font-black tracking-tight">Confirm your account</h1>
-      <p role="status" className="mt-4 flex items-center gap-3 text-base font-bold">
-        <Spinner />
-        Confirming your account…
-      </p>
-    </section>
+    <Card>
+      <CardHeader>
+        <CardTitle as="h1">Confirm your account</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <p role="status" className="flex items-center gap-3 text-base font-bold">
+          <Spinner />
+          Confirming your account…
+        </p>
+      </CardContent>
+    </Card>
   );
 }

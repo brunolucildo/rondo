@@ -90,6 +90,9 @@ describe("the Sign out button on the home (R3)", () => {
     const user = userEvent.setup();
     const { router } = await openHome();
 
+    // The shell header holds the theme toggle first, then Sign out.
+    await user.tab();
+    expect(screen.getByRole("button", { name: "Dark theme" })).toHaveFocus();
     await user.tab();
     expect(screen.getByRole("button", { name: "Sign out" })).toHaveFocus();
 

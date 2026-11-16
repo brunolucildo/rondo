@@ -1,9 +1,20 @@
 import { Link } from "@tanstack/react-router";
+import { Alert } from "@repo/ui/alert";
 import { Button } from "@repo/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@repo/ui/card";
+import { Field } from "@repo/ui/field";
 import { Input } from "@repo/ui/input";
-import { Label } from "@repo/ui/label";
 import { PasswordInput } from "@repo/ui/password-input";
+import { Spinner } from "@repo/ui/spinner";
 import { useState, type ChangeEvent, type FormEvent } from "react";
+import { AUTH_LINK_CLASS } from "./auth-styles";
 import { describeSignUpFailure } from "./describe-sign-up-failure";
 import {
   EMPTY_SIGN_UP_VALUES,
@@ -41,31 +52,12 @@ const FIELDS: Record<SignUpField, FieldConfig> = {
   },
 };
 
-const CARD_CLASS = "border-2 border-border bg-card p-6 shadow-[4px_4px_0_0_var(--color-border)]";
-const LINK_CLASS =
-  "inline-flex min-h-11 items-center font-bold underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
-
 function focusField(name: SignUpField) {
   document.getElementById(`sign-up-${name}`)?.focus();
 }
 
 function firstInvalid(errors: SignUpErrors): SignUpField | undefined {
   return SIGN_UP_FIELDS.find((name) => errors[name] !== undefined);
-}
-
-function Spinner() {
-  return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="3"
-      className="animate-spin motion-reduce:animate-none"
-    >
-      <path d="M12 3a9 9 0 1 0 9 9" />
-    </svg>
-  );
 }
 
 export function SignUpPage() {
@@ -78,25 +70,33 @@ export function SignUpPage() {
 
   if (signUp.isSuccess) {
     return (
-      <section className={CARD_CLASS}>
-        <h1
-          ref={(element) => element?.focus()}
-          tabIndex={-1}
-          className="text-3xl font-black tracking-tight focus-visible:outline-none"
-        >
-          Check your email
-        </h1>
-        <p className="mt-4 text-base">
-          We sent a confirmation link to <strong className="break-all">{signUp.data.email}</strong>.
-          Open it to confirm your account. The link expires in 24 hours.
-        </p>
-        <p className="mt-6 text-base">
-          Already confirmed?{" "}
-          <Link to="/auth/sign-in" className={LINK_CLASS}>
-            Sign in
-          </Link>
-        </p>
-      </section>
+      <Card>
+        <CardHeader>
+          <CardTitle
+            as="h1"
+            ref={(element) => element?.focus()}
+            tabIndex={-1}
+            className="focus-visible:outline-none"
+          >
+            Check your email
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-base">
+            We sent a confirmation link to{" "}
+            <strong className="break-all">{signUp.data.email}</strong>. Open it to confirm your
+            account. The link expires in 24 hours.
+          </p>
+        </CardContent>
+        <CardFooter>
+          <p className="text-base">
+            Already confirmed?{" "}
+            <Link to="/auth/sign-in" className={AUTH_LINK_CLASS}>
+              Sign in
+            </Link>
+          </p>
+        </CardFooter>
+      </Card>
     );
   }
 
@@ -155,100 +155,96 @@ export function SignUpPage() {
 
   function renderField(name: SignUpField) {
     const field = FIELDS[name];
-    const inputId = `sign-up-${name}`;
-    const errorId = `${inputId}-error`;
-    const error = visibleError(name);
 
     return (
-      <div key={name} className="space-y-2">
-        <Label htmlFor={inputId}>{field.label}</Label>
-        {field.type === "password" ? (
-          <PasswordInput
-            id={inputId}
-            name={name}
-            visibilityLabel={field.visibilityLabel}
-            autoComplete={field.autoComplete}
-            value={values[name]}
-            onChange={handleChange}
-            readOnly={pending}
-            aria-invalid={error ? true : undefined}
-            aria-describedby={error ? errorId : undefined}
-            required
-          />
-        ) : (
-          <Input
-            id={inputId}
-            name={name}
-            type={field.type}
-            autoComplete={field.autoComplete}
-            value={values[name]}
-            onChange={handleChange}
-            readOnly={pending}
-            aria-invalid={error ? true : undefined}
-            aria-describedby={error ? errorId : undefined}
-            required
-          />
-        )}
-        {error ? (
-          <p id={errorId} className="text-base font-bold text-destructive">
-            {error}
-            {name === "email" && emailTaken ? (
-              <>
-                {" "}
-                <Link to="/auth/sign-in" className={LINK_CLASS}>
-                  Sign in
-                </Link>
-              </>
-            ) : null}
-          </p>
-        ) : null}
-      </div>
+      <Field
+        key={name}
+        id={`sign-up-${name}`}
+        label={field.label}
+        error={visibleError(name)}
+        errorAction={
+          name === "email" && emailTaken ? (
+            <>
+              {" "}
+              <Link to="/auth/sign-in" className={AUTH_LINK_CLASS}>
+                Sign in
+              </Link>
+            </>
+          ) : undefined
+        }
+      >
+        {(control) =>
+          field.type === "password" ? (
+            <PasswordInput
+              {...control}
+              name={name}
+              visibilityLabel={field.visibilityLabel}
+              autoComplete={field.autoComplete}
+              value={values[name]}
+              onChange={handleChange}
+              readOnly={pending}
+              required
+            />
+          ) : (
+            <Input
+              {...control}
+              name={name}
+              type={field.type}
+              spellCheck={field.type === "email" ? false : undefined}
+              autoComplete={field.autoComplete}
+              value={values[name]}
+              onChange={handleChange}
+              readOnly={pending}
+              required
+            />
+          )
+        }
+      </Field>
     );
   }
 
   return (
-    <section className={CARD_CLASS}>
-      <h1 className="text-3xl font-black tracking-tight">Create your account</h1>
-      <p className="mt-2 text-base text-muted-foreground">
-        Use your email to get started. We will ask you to confirm it.
-      </p>
+    <Card>
+      <CardHeader>
+        <CardTitle as="h1">Create your account</CardTitle>
+        <CardDescription>
+          Use your email to get started. We will ask you to confirm it.
+        </CardDescription>
+      </CardHeader>
 
-      <form noValidate onSubmit={handleSubmit} className="mt-6 space-y-5">
-        {generalError ? (
-          <p
-            role="alert"
-            className="border-2 border-destructive bg-background p-3 text-base font-bold text-destructive"
-          >
-            {generalError}
-          </p>
-        ) : null}
+      <CardContent>
+        <form noValidate onSubmit={handleSubmit} className="space-y-5">
+          {generalError ? <Alert variant="error">{generalError}</Alert> : null}
 
-        <div className="grid gap-5 sm:grid-cols-2">
-          {renderField("firstName")}
-          {renderField("lastName")}
-        </div>
-        {renderField("email")}
-        {renderField("password")}
-        {renderField("confirmPassword")}
+          <div className="grid gap-5 sm:grid-cols-2">
+            {renderField("firstName")}
+            {renderField("lastName")}
+          </div>
+          {renderField("email")}
+          {renderField("password")}
+          {renderField("confirmPassword")}
 
-        <Button type="submit" size="lg" className="w-full" disabled={pending} aria-busy={pending}>
-          {pending ? (
-            <>
-              <Spinner />
-              Creating account…
-            </>
-          ) : (
-            "Create account"
-          )}
-        </Button>
-      </form>
+          <Button type="submit" size="lg" className="w-full" disabled={pending} aria-busy={pending}>
+            {pending ? (
+              <>
+                <Spinner />
+                Creating account…
+              </>
+            ) : (
+              "Create account"
+            )}
+          </Button>
+        </form>
+      </CardContent>
 
-      <p className="mt-6 text-base">
-        Already have an account?{" "}
-        <Link to="/auth/sign-in" className={LINK_CLASS}>
-          Sign in
-        </Link>
-      </p>
-    </section>
+      <CardFooter>
+        <p className="text-base">
+          Already have an account?{" "}
+          <Link to="/auth/sign-in" className={AUTH_LINK_CLASS}>
+            Sign in
+          </Link>
+        </p>
+      </CardFooter>
+    </Card>
   );
 }

@@ -1,9 +1,20 @@
 import { Link, useSearch } from "@tanstack/react-router";
+import { Alert } from "@repo/ui/alert";
 import { Button } from "@repo/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@repo/ui/card";
+import { Field } from "@repo/ui/field";
 import { Input } from "@repo/ui/input";
-import { Label } from "@repo/ui/label";
 import { PasswordInput } from "@repo/ui/password-input";
+import { Spinner } from "@repo/ui/spinner";
 import { useState, type ChangeEvent, type FormEvent } from "react";
+import { AUTH_LINK_CLASS } from "./auth-styles";
 import { describeSignInFailure } from "./describe-sign-in-failure";
 import {
   EMPTY_SIGN_IN_VALUES,
@@ -27,31 +38,12 @@ const FIELDS: Record<SignInField, FieldConfig> = {
   password: { label: "Password", type: "password", autoComplete: "current-password" },
 };
 
-const CARD_CLASS = "border-2 border-border bg-card p-6 shadow-[4px_4px_0_0_var(--color-border)]";
-const LINK_CLASS =
-  "inline-flex min-h-11 items-center font-bold underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
-
 function focusField(name: SignInField) {
   document.getElementById(`sign-in-${name}`)?.focus();
 }
 
 function firstInvalid(errors: SignInErrors): SignInField | undefined {
   return SIGN_IN_FIELDS.find((name) => errors[name] !== undefined);
-}
-
-function Spinner() {
-  return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="3"
-      className="animate-spin motion-reduce:animate-none"
-    >
-      <path d="M12 3a9 9 0 1 0 9 9" />
-    </svg>
-  );
 }
 
 export function SignInPage() {
@@ -116,98 +108,83 @@ export function SignInPage() {
 
   function renderField(name: SignInField) {
     const field = FIELDS[name];
-    const inputId = `sign-in-${name}`;
-    const errorId = `${inputId}-error`;
-    const error = visibleError(name);
-
-    const inputProps = {
-      id: inputId,
-      name,
-      autoComplete: field.autoComplete,
-      value: values[name],
-      onChange: handleChange,
-      readOnly: pending,
-      "aria-invalid": error ? true : undefined,
-      "aria-describedby": error ? errorId : undefined,
-      required: true,
-    };
 
     return (
-      <div key={name} className="space-y-2">
-        <Label htmlFor={inputId}>{field.label}</Label>
-        {field.type === "password" ? (
-          <PasswordInput {...inputProps} visibilityLabel="password" />
-        ) : (
-          <Input {...inputProps} type={field.type} />
-        )}
-        {error ? (
-          <p id={errorId} className="text-base font-bold text-destructive">
-            {error}
-          </p>
-        ) : null}
-      </div>
+      <Field key={name} id={`sign-in-${name}`} label={field.label} error={visibleError(name)}>
+        {(control) => {
+          const inputProps = {
+            ...control,
+            name,
+            autoComplete: field.autoComplete,
+            value: values[name],
+            onChange: handleChange,
+            readOnly: pending,
+            required: true,
+          };
+
+          return field.type === "password" ? (
+            <PasswordInput {...inputProps} visibilityLabel="password" />
+          ) : (
+            <Input {...inputProps} type={field.type} spellCheck={false} />
+          );
+        }}
+      </Field>
     );
   }
 
   return (
-    <section className={CARD_CLASS}>
-      <h1 className="text-3xl font-black tracking-tight">Sign in</h1>
-      <p className="mt-2 text-base text-muted-foreground">
-        Use the email and password of your account.
-      </p>
+    <Card>
+      <CardHeader>
+        <CardTitle as="h1">Sign in</CardTitle>
+        <CardDescription>Use the email and password of your account.</CardDescription>
+      </CardHeader>
 
-      {passwordWasReset ? (
-        <p
-          role="status"
-          className="mt-4 border-2 border-border bg-background p-3 text-base font-bold"
-        >
-          Your password was updated. Sign in with your new password.
-        </p>
-      ) : null}
-
-      <form noValidate onSubmit={handleSubmit} className="mt-6 space-y-5">
-        {generalError ? (
-          <p
-            role="alert"
-            className="border-2 border-destructive bg-background p-3 text-base font-bold text-destructive"
-          >
-            {generalError}
-            {unconfirmed ? (
-              <>
-                {" "}
-                <Link to="/auth/resend-confirmation" className={LINK_CLASS}>
-                  Resend confirmation email
-                </Link>
-              </>
-            ) : null}
-          </p>
+      <CardContent className="space-y-5">
+        {passwordWasReset ? (
+          <Alert variant="success">
+            Your password was updated. Sign in with your new password.
+          </Alert>
         ) : null}
 
-        {renderField("email")}
-        {renderField("password")}
+        <form noValidate onSubmit={handleSubmit} className="space-y-5">
+          {generalError ? (
+            <Alert variant="error">
+              {generalError}
+              {unconfirmed ? (
+                <>
+                  {" "}
+                  <Link to="/auth/resend-confirmation" className={AUTH_LINK_CLASS}>
+                    Resend confirmation email
+                  </Link>
+                </>
+              ) : null}
+            </Alert>
+          ) : null}
 
-        <Button type="submit" size="lg" className="w-full" disabled={pending} aria-busy={pending}>
-          {pending ? (
-            <>
-              <Spinner />
-              Signing in…
-            </>
-          ) : (
-            "Sign in"
-          )}
-        </Button>
-      </form>
+          {renderField("email")}
+          {renderField("password")}
 
-      <p className="mt-6 text-base">
-        <Link to="/auth/forgot-password" className={LINK_CLASS}>
+          <Button type="submit" size="lg" className="w-full" disabled={pending} aria-busy={pending}>
+            {pending ? (
+              <>
+                <Spinner />
+                Signing in…
+              </>
+            ) : (
+              "Sign in"
+            )}
+          </Button>
+        </form>
+      </CardContent>
+
+      <CardFooter className="flex flex-col items-start">
+        <Link to="/auth/forgot-password" className={AUTH_LINK_CLASS}>
           Forgot your password?
         </Link>
-      </p>
-      <p className="text-base">
-        <Link to="/auth/sign-up" className={LINK_CLASS}>
+        <Link to="/auth/sign-up" className={AUTH_LINK_CLASS}>
           Create an account
         </Link>
-      </p>
-    </section>
+      </CardFooter>
+    </Card>
   );
 }

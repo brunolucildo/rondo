@@ -1,0 +1,110 @@
+@import "./fonts.css";
+
+/*
+ * Rondo design tokens (DESIGN.md §2, DESIGN_SYSTEM.md §3). Plain CSS, no Tailwind, so that
+ * every app can use it (`apps/docs` imports this file alone).
+ *
+ * Layers: primitives (raw palette; the only place with hex) -> semantic (what components use).
+ * Themes: `:root` is the light theme; `:root[data-theme="dark"]` is the dark one. The attribute
+ * is always set before the first paint by the script in `theme.ts` (ADR 0018).
+ */
+:root {
+  color-scheme: light;
+
+  /* Primitives: brand palette (fixed, the logo never changes with a theme). */
+  --color-blaze-orange: #fb6107;
+  --color-golden-glow: #f3de2c;
+  --color-lime-moss: #7cb518;
+  --color-forest-moss: #5c8001;
+  --color-sunflower-gold: #fbb02d;
+  --color-ink: #0a0a0a;
+  --color-paper: #fffdf5;
+
+  /* Primitives: neutrals and cards derived for the themes. */
+  --color-paper-shade: #f1ede1;
+  --color-ink-muted: #6b6b6b;
+  --color-night: #0f0f0c;
+  --color-night-raised: #1b1b16;
+  --color-night-hover: #2a2a22;
+  --color-chalk-muted: #b5b1a0;
+  --color-card-red: #b91c1c;
+  --color-card-red-light: #f87171;
+
+  /* Semantic: light theme. */
+  --background: var(--color-paper);
+  --foreground: var(--color-ink);
+  --card: var(--color-paper);
+  --card-foreground: var(--color-ink);
+  --primary: var(--color-blaze-orange);
+  --primary-foreground: var(--color-ink);
+  --secondary: var(--color-golden-glow);
+  --secondary-foreground: var(--color-ink);
+  --muted: var(--color-paper-shade);
+  --muted-foreground: var(--color-ink-muted);
+  --accent: var(--color-sunflower-gold);
+  --accent-foreground: var(--color-ink);
+  --destructive: var(--color-card-red);
+  --destructive-foreground: var(--color-paper);
+  --success: var(--color-lime-moss);
+  --success-foreground: var(--color-ink);
+  --warning: var(--color-golden-glow);
+  --warning-foreground: var(--color-ink);
+  --info: var(--color-paper-shade);
+  --info-foreground: var(--color-ink);
+  --border: var(--color-ink);
+  --input: var(--color-ink);
+  --ring: var(--color-forest-moss);
+  --shadow-color: var(--color-ink);
+
+  /* Semantic: logo and pitch (the pitch is brand colors in both themes). */
+  --logo-outline: var(--color-ink);
+  --logo-left: var(--color-forest-moss);
+  --field-grass-a: var(--color-lime-moss);
+  --field-grass-b: var(--color-forest-moss);
+  --field-line: var(--color-paper);
+
+  /* Shape, depth and motion. Spacing is Tailwind's 4px scale. */
+  --radius: 0.25rem;
+  --pixel-shadow: 4px 4px 0 0 var(--shadow-color);
+  --pixel-shadow-sm: 2px 2px 0 0 var(--shadow-color);
+  --pixel-ease: steps(3, end);
+
+  /* Typography. */
+  --font-family-display: "Press Start 2P", ui-monospace, "Courier New", monospace;
+  --font-family-sans: "Geist", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-family-mono: "Geist Mono", ui-monospace, "Cascadia Code", Consolas, monospace;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --background: var(--color-night);
+  --foreground: var(--color-paper);
+  --card: var(--color-night-raised);
+  --card-foreground: var(--color-paper);
+  --muted: var(--color-night-hover);
+  --muted-foreground: var(--color-chalk-muted);
+  --destructive: var(--color-card-red-light);
+  --destructive-foreground: var(--color-ink);
+  --info: var(--color-night-raised);
+  --info-foreground: var(--color-paper);
+  --border: var(--color-paper);
+  --input: var(--color-paper);
+  --ring: var(--color-golden-glow);
+  --shadow-color: var(--color-forest-moss);
+
+  --logo-outline: var(--color-paper);
+  --logo-left: var(--color-sunflower-gold);
+}
+
+/* Motion is never essential here: with a reduced-motion preference it all stops. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
