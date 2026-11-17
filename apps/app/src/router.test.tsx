@@ -3,7 +3,7 @@ import { screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ACCESS_TOKEN_KEY } from "./lib/access-token";
 import type { RouteFactory } from "./router";
-import { jsonResponse, renderApp, SESSION_USER, stubSessionFetch } from "./test/render-app";
+import { HOME_HEADING, jsonResponse, renderApp, SESSION_USER, stubSessionFetch } from "./test/render-app";
 
 const originalFetch = globalThis.fetch;
 
@@ -33,7 +33,7 @@ describe("app routing", () => {
     it("redirects / to /app and shows the home", async () => {
       const { router } = renderApp("/");
 
-      expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent("Welcome, Ana");
+      expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent(HOME_HEADING);
       expect(router.state.location.pathname).toBe("/app");
     });
 
@@ -43,7 +43,7 @@ describe("app routing", () => {
       const layout = await screen.findByTestId("app-layout");
 
       expect(await within(layout).findByRole("heading", { level: 1 })).toHaveTextContent(
-        "Welcome, Ana",
+        HOME_HEADING,
       );
     });
 

@@ -103,6 +103,38 @@ describe("validateEnvironment", () => {
     });
   });
 
+  describe("expert chat model", () => {
+    it("uses the scripted fake in test, whatever OPENAI_API_KEY says", () => {
+      expect(validateEnvironment({ ...validEnv, OPENAI_API_KEY: "sk-test" }).expertChat).toEqual({
+        provider: "fake",
+      });
+    });
+
+    it("boots without OPENAI_API_KEY and reports the experts as unavailable", () => {
+      const env = {
+        ...validEnv,
+        NODE_ENV: "production",
+        RESEND_API_KEY: "re_test",
+      };
+
+      expect(validateEnvironment(env).expertChat).toEqual({ provider: "unavailable" });
+    });
+
+    it("reads OPENAI_API_KEY and OPENAI_CHAT_MODEL outside tests", () => {
+      const env = { ...validEnv, NODE_ENV: "production", RESEND_API_KEY: "re_test" };
+
+      expect(validateEnvironment({ ...env, OPENAI_API_KEY: "sk-x" }).expertChat).toEqual({
+        provider: "openai",
+        apiKey: "sk-x",
+        model: "gpt-4o-mini",
+      });
+      expect(
+        validateEnvironment({ ...env, OPENAI_API_KEY: "sk-x", OPENAI_CHAT_MODEL: "gpt-4o" })
+          .expertChat,
+      ).toMatchObject({ model: "gpt-4o" });
+    });
+  });
+
   it("exposes the database URL without changing it", () => {
     expect(validateEnvironment(validEnv).databaseUrl).toBe(validEnv.DATABASE_URL);
   });

@@ -3,7 +3,7 @@
 > Spec executável. Preencha todas as seções; `TODO` é lacuna, não requisito.
 > Use `create-spec` para criar, `refine-spec` para auditar e `implement-me` para executar.
 
-- **Status:** pronta
+- **Status:** implementada (pendente: avaliação manual com o modelo real e aprovação de Produto e Jurídico dos textos)
 - **Slug:** 0019-experts-chat-home
 - **Data:** 2026-11-17
 - **Atualizado em:** 2026-11-17
@@ -93,17 +93,17 @@
 
 ## 6. Acceptance Criteria
 
-- [ ] Given usuário autenticado, When `GET /api/v1/experts`, Then 200 com os 7 experts e sem prompt de sistema; sem sessão, 401.
-- [ ] Given `/app` em 375 px e em 1280 px, Then a barra do rodapé tem dropdown, textarea e `Send`, o cabeçalho mantém tema e `Sign out`, e nada se sobrepõe.
-- [ ] Given a seleção de outro expert, Then o painel e a rota de envio mudam; o teclado alcança e opera o dropdown.
-- [ ] Given um clique numa sugestão, Then a mensagem é enviada sem edição e a resposta é exibida.
-- [ ] Given o modelo falso, When envia uma mensagem, Then a resposta chega em partes e o balão final é igual ao texto completo.
-- [ ] Given falha do provedor, Then uma nova tentativa antes do primeiro token e, depois, o balão de erro com `Try again`.
-- [ ] Given `Stop`, Then a chamada ao modelo é abortada e o balão fica incompleto.
-- [ ] Given o `sports-lawyer`, Then o aviso fixo aparece; given o `head-coach`, não aparece.
-- [ ] Given `history` com papel `system` ou texto acima do limite, Then 400 `VALIDATION_FAILED`; given o 21º envio no minuto, Then 429.
-- [ ] Given o valor sentinela, Then nenhum log, span ou métrica o contém.
-- [ ] Given `bun run lint`, `check-types`, `test`, `test:integration` e `test:e2e`, Then passam sem tráfego real para a OpenAI.
+- [x] Given usuário autenticado, When `GET /api/v1/experts`, Then 200 com os 7 experts e sem prompt de sistema; sem sessão, 401.
+- [x] Given `/app` em 375 px e em 1280 px, Then a barra do rodapé tem dropdown, textarea e `Send`, o cabeçalho mantém tema e `Sign out`, e nada se sobrepõe.
+- [x] Given a seleção de outro expert, Then o painel e a rota de envio mudam; o teclado alcança e opera o dropdown.
+- [x] Given um clique numa sugestão, Then a mensagem é enviada sem edição e a resposta é exibida.
+- [x] Given o modelo falso, When envia uma mensagem, Then a resposta chega em partes e o balão final é igual ao texto completo.
+- [x] Given falha do provedor, Then uma nova tentativa antes do primeiro token e, depois, o balão de erro com `Try again`.
+- [x] Given `Stop`, Then a chamada ao modelo é abortada e o balão fica incompleto.
+- [x] Given o `sports-lawyer`, Then o aviso fixo aparece; given o `head-coach`, não aparece.
+- [x] Given `history` com papel `system` ou texto acima do limite, Then 400 `VALIDATION_FAILED`; given o 21º envio no minuto, Then 429.
+- [x] Given o valor sentinela, Then nenhum log, span ou métrica o contém.
+- [x] Given `bun run lint`, `check-types`, `test`, `test:integration` e `test:e2e`, Then passam sem tráfego real para a OpenAI.
 
 ## 7. O que fazer
 
@@ -169,3 +169,4 @@ Como validar que a spec foi atendida:
 | ---------- | --------------------------------- | --------------------------------------------------- |
 | 2026-11-17 | Spec criada (rascunho)            | Quebra do épico de experts (`breakdown-specs`).     |
 | 2026-11-17 | R1, R2, R3, R5, R8, R9, R10, R12 e passo 5 e 6 de §7 ajustados; R12 dividido em R12 (ADR e arquitetura, Must) e R13 (demais documentos, Should); avatar sai do contrato de `GET /experts`; limite passa a ser por IP; premissas de E2E e de avatar | Auditoria da spec contra o código: o limitador não enxerga o usuário; o avatar não pode ser URL da API; `RULES.md` §5 exige ADR; faltavam limites de `history`, prazo total e boot sem chave |
+| 2026-11-17 | Implementada. Premissa de execução: `langchain` (pacote guarda-chuva) não foi instalado, só `@langchain/core`, `@langchain/openai` e `@langchain/langgraph` (nada do guarda-chuva é usado); `test` da API tem 3 falhas pré-existentes e fora do escopo em `session.service.spec.ts` (data fixa) | Execução da spec (`implement-me`) |

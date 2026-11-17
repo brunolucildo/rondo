@@ -43,7 +43,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
-function toApiError(status: number, payload: unknown): ApiError {
+/** Builds the typed error from an error response: the envelope when it is one, else a generic one. */
+export function toApiError(status: number, payload: unknown): ApiError {
   const envelope = isRecord(payload) && isRecord(payload.error) ? payload.error : undefined;
 
   if (

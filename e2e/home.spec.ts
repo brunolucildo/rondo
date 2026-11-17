@@ -32,8 +32,8 @@ test("redirects / to /app and renders the home without console errors when signe
 
   await expect(page).toHaveURL(/\/app$/);
   await expect(page.locator("h1")).toHaveCount(1);
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Welcome, Carla");
-  await expect(page.getByText("You are signed in.")).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Chat with the experts");
+  await expect(page.getByRole("combobox", { name: "Expert" })).toBeVisible();
   await expect(page.locator("html")).toHaveAttribute("lang", "en-US");
   expect(consoleErrors).toEqual([]);
   expect(failedRequests).toEqual([]);
