@@ -144,7 +144,7 @@ Como validar que a spec foi atendida:
 | ---------- | ---------------------- | ----------------------------------------------- |
 | 2026-11-17 | Spec criada (rascunho) | Quebra do épico de experts (`breakdown-specs`). |
 | 2026-11-17 | Passo 8 inclui o ADR da exclusão | Auditoria: `RULES.md` §5 pede ADR para decisão de dados e retenção; nenhum requisito alterado |
-| 2026-11-17 | Implementada (status concluída; critérios marcados) | Execução do `implement-me` (orquestrada): API de listagem e exclusão, citações removidas, painel, testes, docs e ADR provisório `0026-0025-exclusao-de-conexoes` |
+| 2026-11-17 | Implementada (status concluída; critérios marcados) | Execução do `implement-me` (orquestrada): API de listagem e exclusão, citações removidas, painel, testes, docs e ADR provisório `0026-exclusao-de-conexoes` |
 
 ### Premissas registradas na implementação
 

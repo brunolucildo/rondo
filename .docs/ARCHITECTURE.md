@@ -334,7 +334,7 @@ Liga o índice (0022) e as conexões (0023) ao chat: a cada mensagem o grafo bus
 
 ### 4.12 Gerenciar e excluir conexões (spec `0025`, módulos `connections` e `experts`)
 
-Fecha o ciclo de vida das conexões: listar, excluir uma e excluir todas, com a exclusão completa e verificável (LGPD). Decisão no ADR `0026-0025-exclusao-de-conexoes` (número provisório).
+Fecha o ciclo de vida das conexões: listar, excluir uma e excluir todas, com a exclusão completa e verificável (LGPD). Decisão no ADR `0026-exclusao-de-conexoes`.
 
 - **Endpoints (sessão obrigatória; `userId` só da sessão):** `GET /api/v1/connections` (`{ connections: [...] }`, da mais recente para a mais antiga, só as do usuário; sem nenhuma, lista vazia), `DELETE /api/v1/connections/:id` e `DELETE /api/v1/connections` (ambos `204`). Erros da exclusão: `400 VALIDATION_FAILED` (id que não é UUID), `404 CONNECTION_NOT_FOUND` (inexistente ou de outro usuário), `409 CONNECTION_PROCESSING` (alguma está `processing` há menos de 15 minutos; na exclusão total nada é apagado) e `503 KNOWLEDGE_UNAVAILABLE` (o índice falhou; nada mais é tocado).
 - **Ordem e idempotência:** vetores primeiro (`KnowledgeIndex.deleteByConnection` ou `deleteAllForUser`), linha depois (`ConnectionRepository.deleteSettled` e `deleteAllSettled`, `delete ... where not (status = 'processing' and updated_at >= corte)`). A linha leva a identidade de deduplicação, então reenviar o mesmo arquivo cria uma conexão nova e reprocessa. Repetir depois de um `503` conclui o trabalho; repetir depois do sucesso é `404` (individual) ou `204` (total). `failed`, `ready` e `processing` há mais de 15 minutos podem ser excluídas.

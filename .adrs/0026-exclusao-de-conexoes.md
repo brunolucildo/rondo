@@ -1,6 +1,6 @@
 # 0026 — Exclusão de conexões: vetores primeiro, linha depois
 
-- **Status:** aceito (número provisório: o orquestrador renumera)
+- **Status:** aceito
 - **Data:** 2026-11-17
 
 ## Contexto
