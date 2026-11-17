@@ -1,4 +1,5 @@
 import type { Expert } from "./expert";
+import { EXPERT_LIMITS } from "./expert-rules";
 
 export type ModelMessageRole = "system" | "user" | "assistant";
 
@@ -7,7 +8,7 @@ export interface ModelMessage {
   content: string;
 }
 
-/** A previous turn of the conversation, as the client sends it. Never `system`. */
+/** A stored message of the conversation (read from the database, never from the client). Never `system`. */
 export interface ChatTurn {
   role: "user" | "assistant";
   content: string;
@@ -59,7 +60,9 @@ export function buildConversation(
 ): ModelMessage[] {
   return [
     { role: "system", content: buildSystemPrompt(expert) },
-    ...history.map((turn): ModelMessage => ({ role: turn.role, content: turn.content })),
+    ...history
+      .slice(-EXPERT_LIMITS.contextMessages)
+      .map((turn): ModelMessage => ({ role: turn.role, content: turn.content })),
     { role: "user", content },
   ];
 }

@@ -3,7 +3,7 @@
 > Spec executável. Preencha todas as seções; `TODO` é lacuna, não requisito.
 > Use `create-spec` para criar, `refine-spec` para auditar e `implement-me` para executar.
 
-- **Status:** pronta
+- **Status:** concluída (pendente: avaliação manual com o modelo real e decisão de Produto/Jurídico sobre expiração automática)
 - **Slug:** 0020-experts-chat-history
 - **Data:** 2026-11-17
 - **Atualizado em:** 2026-11-17
@@ -74,18 +74,18 @@
 
 ## 6. Acceptance Criteria
 
-- [ ] Given a migration, Then `rondo_app` tem DML e não tem DDL (`42501`), e `(user_id, expert_id)` é único.
-- [ ] Given 120 mensagens, Then `GET` devolve 50, em ordem cronológica, e o cursor traz as 50 anteriores.
-- [ ] Given dois usuários, Then cada um só lê, envia e apaga as próprias mensagens.
-- [ ] Given 30 mensagens, Then o modelo recebe a persona e as 20 últimas mais a nova, e a resposta é gravada.
-- [ ] Given `Stop`, Then a resposta fica `incomplete` com o texto parcial.
-- [ ] Given `{ content, history }`, Then `400 VALIDATION_FAILED`.
-- [ ] Given uma resposta em curso, Then outro envio do mesmo par recebe `409 CONVERSATION_BUSY`; outro expert não é bloqueado.
-- [ ] Given `Clear conversation` confirmado, Then `204` e o estado vazio persiste após recarregar; sem confirmar, nada muda.
-- [ ] Given 201 mensagens, Then a mais antiga é removida e o total fica 200.
-- [ ] Given o sentinela, Then nenhum log, span ou métrica o contém.
-- [ ] Given recarregar a página e trocar de expert, Then cada conversa reaparece na ordem certa.
-- [ ] Given `bun run lint`, `check-types`, `test`, `test:integration` e `test:e2e`, Then passam.
+- [x] Given a migration, Then `rondo_app` tem DML e não tem DDL (`42501`), e `(user_id, expert_id)` é único.
+- [x] Given 120 mensagens, Then `GET` devolve 50, em ordem cronológica, e o cursor traz as 50 anteriores.
+- [x] Given dois usuários, Then cada um só lê, envia e apaga as próprias mensagens.
+- [x] Given 30 mensagens, Then o modelo recebe a persona e as 20 últimas mais a nova, e a resposta é gravada.
+- [x] Given `Stop`, Then a resposta fica `incomplete` com o texto parcial.
+- [x] Given `{ content, history }`, Then `400 VALIDATION_FAILED`.
+- [x] Given uma resposta em curso, Then outro envio do mesmo par recebe `409 CONVERSATION_BUSY`; outro expert não é bloqueado.
+- [x] Given `Clear conversation` confirmado, Then `204` e o estado vazio persiste após recarregar; sem confirmar, nada muda.
+- [x] Given 201 mensagens, Then a mais antiga é removida e o total fica 200.
+- [x] Given o sentinela, Then nenhum log, span ou métrica o contém.
+- [x] Given recarregar a página e trocar de expert, Then cada conversa reaparece na ordem certa.
+- [x] Given `bun run lint`, `check-types`, `test`, `test:integration` e `test:e2e`, Then passam.
 
 ## 7. O que fazer
 
@@ -135,10 +135,14 @@ Como validar que a spec foi atendida:
 | Pergunta: a LGPD pede uma expiração automática (por exemplo, 90 dias) para conversas com dados de saúde?                                                | Job de limpeza e texto de privacidade.                          | Não         | Jurídico/Produto   |
 | **Premissa:** o modelo recebe as últimas 20 mensagens; não há resumo de mensagens antigas.                                                              | Qualidade em conversas longas.                                  | Não         | Eng.               |
 | **Premissa:** a trava de concorrência é em memória (instância única), no mesmo espírito do ADR `0005`.                                                  | Escala horizontal da API.                                       | Não         | Eng.               |
+| **Premissa (execução):** sem nenhum texto recebido (falha, `Stop` antes do primeiro token ou cliente já ausente), a pergunta recém-gravada é retirada; assim `Try again` nunca deixa a mesma pergunta duas vezes. Com texto parcial, o parcial fica `incomplete` e `Try again` envia a pergunta de novo (o histórico guarda os dois, como o modelo os vê). | Duplicidade no histórico e contexto do modelo.                  | Não         | Eng.               |
+| **Premissa (execução):** a resposta é gravada antes do último evento do stream (`done` implica gravada); falha ao gravar termina o stream com o erro `EXPERT_ANSWER_FAILED` (razão interna `storage_error`). | Consistência ao recarregar logo após a resposta.                | Não         | Eng.               |
+| **Premissa (execução):** a interface carrega e mostra só a página mais recente (50 mensagens); carregar as anteriores pelo `nextCursor` fica no backlog. A confirmação de `Clear conversation` é um `alertdialog` inline (o `@repo/ui` não tem componente de diálogo). | UX de conversas longas e componente de diálogo.                 | Não         | Produto/Eng.       |
 
 ## 12. Refinamento
 
 | Data       | O que mudou            | Motivo                                          |
 | ---------- | ---------------------- | ----------------------------------------------- |
 | 2026-11-17 | Spec criada (rascunho) | Quebra do épico de experts (`breakdown-specs`). |
+| 2026-11-17 | Implementada (status `concluída`); premissas de execução registradas em §11 | Execução orquestrada (`implement-me`): compensação da pergunta sem resposta, gravação antes do último evento, página única na interface |
 | 2026-11-17 | R2, R4 e R8 detalhados (validação de `limit` e `before`, respostas incompletas no contexto, remoção na mesma transação); ADR no passo 8 | Auditoria: cursor e limites sem critério de erro, ambiguidade sobre `incomplete` e atomicidade da retenção; `RULES.md` §5 pede ADR para modelo de dados |

@@ -1,10 +1,8 @@
-import {
-  buildConversation,
-  type ChatTurn,
-  type ModelMessage,
-} from "../../domain/expert-conversation";
+import type { ConversationLock, ConversationRepository } from "../../domain/conversation-ports";
+import { buildConversation, type ModelMessage } from "../../domain/expert-conversation";
 import { findExpert } from "../../domain/expert-catalog";
 import {
+  ConversationBusyError,
   ExpertModelError,
   ExpertNotFoundError,
   ExpertUnavailableError,
@@ -14,11 +12,22 @@ import { EXPERT_LIMITS } from "../../domain/expert-rules";
 import type { ExpertId } from "../../domain/expert";
 
 export interface SendExpertMessageInput {
+  /** The user of the session: the only owner of the conversation this call reads and writes. */
+  userId: string;
   expertId: string;
   content: string;
-  history: readonly ChatTurn[];
   /** Aborted when the caller leaves (client disconnected or pressed Stop). */
   signal: AbortSignal;
+}
+
+export interface SentExpertMessage {
+  /** The answer, as events. Its last event only arrives after the conversation was saved. */
+  events: AsyncGenerator<ExpertAnswerEvent>;
+  /**
+   * Frees the "one answer at a time" lock. The stream frees it by itself when it ends; the caller
+   * also calls it in a `finally`, so a stream that was never read cannot leave the lock held.
+   */
+  release: () => void;
 }
 
 export interface SendExpertMessageTimeouts {
@@ -42,9 +51,16 @@ type AttemptResult =
   | { kind: "failed"; retryable: boolean; emitted: boolean };
 
 /**
- * Answers one message of one expert as a stream of events. The expert and the model are checked
- * up front (`execute` throws before any event exists, so the request can still answer with a
- * plain error); after that, failures are events, never exceptions.
+ * Answers one message of one expert as a stream of events and keeps the conversation. The expert
+ * and the model are checked up front, then the lock of (user, expert) is taken: `execute` throws
+ * before any event exists, so the request can still answer with a plain error (404, 503, 409);
+ * after that, failures are events, never exceptions.
+ *
+ * The model receives the persona, the last 20 stored messages (read here, never sent by the
+ * client) and the new question, which is stored first. The answer is stored when it ends, before
+ * its last event is yielded: complete, or `incomplete` with the text received when it stopped
+ * half way. When no text arrived, the question is taken back, so "Try again" never leaves the
+ * same question twice in the conversation.
  *
  * Policy: 30 s without a first token and 120 s in total, and one new attempt when the model
  * fails (or is silent) before the first token. After the first token there is no retry: the text
@@ -53,10 +69,12 @@ type AttemptResult =
 export class SendExpertMessage {
   constructor(
     private readonly orchestrator: ExpertOrchestrator,
+    private readonly conversations: ConversationRepository,
+    private readonly lock: ConversationLock,
     private readonly timeouts: SendExpertMessageTimeouts = DEFAULT_TIMEOUTS,
   ) {}
 
-  execute(input: SendExpertMessageInput): AsyncGenerator<ExpertAnswerEvent> {
+  async execute(input: SendExpertMessageInput): Promise<SentExpertMessage> {
     const expert = findExpert(input.expertId);
 
     if (expert === undefined) {
@@ -67,11 +85,98 @@ export class SendExpertMessage {
       throw new ExpertUnavailableError();
     }
 
-    return this.run(
-      expert.id,
-      buildConversation(expert, input.history, input.content),
-      input.signal,
-    );
+    const release = this.lock.tryAcquire(input.userId, expert.id);
+
+    if (release === null) {
+      throw new ConversationBusyError();
+    }
+
+    try {
+      const context = await this.conversations.listPage(input.userId, expert.id, {
+        limit: EXPERT_LIMITS.contextMessages,
+        before: null,
+      });
+      const question = await this.conversations.append(input.userId, expert.id, {
+        role: "user",
+        content: input.content,
+        status: "complete",
+      });
+
+      return {
+        events: this.keepAnswer(
+          input.userId,
+          expert.id,
+          question.id,
+          this.run(
+            expert.id,
+            buildConversation(expert, context.messages, input.content),
+            input.signal,
+          ),
+          release,
+        ),
+        release,
+      };
+    } catch (error) {
+      release();
+      throw error;
+    }
+  }
+
+  /**
+   * Stores the answer when the inner stream reaches its last event, then passes that event on, so
+   * a client that reloads right after `done` already finds the answer. Always frees the lock.
+   */
+  private async *keepAnswer(
+    userId: string,
+    expertId: ExpertId,
+    questionId: string,
+    inner: AsyncGenerator<ExpertAnswerEvent>,
+    release: () => void,
+  ): AsyncGenerator<ExpertAnswerEvent> {
+    let text = "";
+    let settled = false;
+
+    const settle = async (complete: boolean): Promise<boolean> => {
+      settled = true;
+
+      try {
+        if (text.trim() === "") {
+          await this.conversations.remove(userId, questionId);
+        } else {
+          await this.conversations.append(userId, expertId, {
+            role: "assistant",
+            content: text,
+            status: complete ? "complete" : "incomplete",
+          });
+        }
+
+        return true;
+      } catch {
+        // The reason is a closed value: the error itself never reaches a log with data in it.
+        return false;
+      }
+    };
+
+    try {
+      for await (const event of inner) {
+        if (event.type === "text") {
+          text += event.text;
+          yield event;
+        } else {
+          const stored = await settle(event.type === "done");
+
+          yield stored || event.type === "aborted"
+            ? event
+            : { type: "failed", reason: "storage_error" };
+        }
+      }
+    } finally {
+      if (!settled) {
+        await settle(false);
+      }
+
+      release();
+    }
   }
 
   private async *run(

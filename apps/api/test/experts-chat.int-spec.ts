@@ -220,16 +220,33 @@ describe("experts chat on the real graph with the scripted model", () => {
     const historySentinel = `HISTORY-${randomUUID()}`;
     const expert = EXPERTS.find((candidate) => candidate.id === "sports-physician");
 
-    await send("sports-physician", {
-      content: `${sentinel} Que remédio devo tomar?`,
-      history: [
-        { role: "user", content: historySentinel },
-        { role: "assistant", content: `${historySentinel} resposta` },
-      ],
-    });
+    // The first message becomes stored history of the second one (the client sends no history).
+    await send("sports-physician", { content: historySentinel });
+    await send("sports-physician", { content: `${sentinel} Que remédio devo tomar?` });
     await send("sports-physician", { content: `${sentinel} ${SCRIPTED_FAIL_MARKER}` });
     await send("goalkeeper", { content: sentinel });
     await send("sports-physician", { content: "a".repeat(4001) + sentinel });
+    await send("sports-physician", {
+      content: sentinel,
+      history: [{ role: "user", content: sentinel }],
+    });
+
+    // Reading, a bad cursor and clearing the conversation go through the same logs and spans.
+    const stored = await request(app.getHttpServer())
+      .get("/api/v1/experts/sports-physician/conversation")
+      .set(bearer(token));
+
+    expect(JSON.stringify(stored.body)).toContain(sentinel);
+    await request(app.getHttpServer())
+      .get(`/api/v1/experts/sports-physician/conversation?before=${sentinel}`)
+      .set(bearer(token));
+    expect(
+      (
+        await request(app.getHttpServer())
+          .delete("/api/v1/experts/sports-physician/conversation")
+          .set(bearer(token))
+      ).status,
+    ).toBe(204);
     artifacts.push(safeJson({ spans: recorder.exportedSpans(), logs: logs() }));
 
     const everything = artifacts.join("\n");

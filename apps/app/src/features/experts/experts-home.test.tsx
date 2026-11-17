@@ -42,13 +42,10 @@ function apiError(status: number, code: string): Response {
 /** The calls to the messages endpoint: `[expertId, body]`. */
 function messageCalls(fetchMock: ReturnType<typeof stubSessionFetch>) {
   return fetchMock.mock.calls
-    .filter(([url]) => String(url).includes("/experts/"))
+    .filter(([url]) => String(url).endsWith("/messages"))
     .map(([url, init]) => ({
       expertId: /\/experts\/([^/]+)\/messages$/.exec(String(url))?.[1],
-      body: JSON.parse(String(init?.body)) as {
-        content: string;
-        history: Array<{ role: string; content: string }>;
-      },
+      body: JSON.parse(String(init?.body)) as { content: string },
       signal: init?.signal,
     }));
 }
@@ -95,6 +92,8 @@ async function openHome() {
 
   await screen.findByRole("heading", { level: 1, name: HOME_HEADING });
   await screen.findByRole("combobox", { name: "Expert" });
+  // The stored conversation loads first: the field is ready once it arrived.
+  await waitFor(() => expect(textbox()).toBeEnabled());
 
   return result;
 }
@@ -226,7 +225,7 @@ describe("the home chat: sending", () => {
     expect(messageCalls(fetchMock)).toEqual([
       expect.objectContaining({
         expertId: "head-coach",
-        body: { content: "Qual escalação você sugere?", history: [] },
+        body: { content: "Qual escalação você sugere?" },
       }),
     ]);
     await waitFor(() => expect(screen.getByRole("log")).toHaveAttribute("aria-busy", "false"));
@@ -248,7 +247,7 @@ describe("the home chat: sending", () => {
     expect(messageCalls(fetchMock)[0]?.body.content).toBe("linha um\nlinha dois");
   });
 
-  it("sends the previous turns as history, with the expert as assistant", async () => {
+  it("sends only the new text: the history lives on the server (R4)", async () => {
     const fetchMock = stubSessionFetch(
       sessionOk,
       () => answer("Primeira."),
@@ -262,13 +261,10 @@ describe("the home chat: sending", () => {
     await user.type(textbox(), "P2{Enter}");
     await screen.findByText("Segunda.");
 
-    expect(messageCalls(fetchMock)[1]?.body).toEqual({
-      content: "P2",
-      history: [
-        { role: "user", content: "P1" },
-        { role: "assistant", content: "Primeira." },
-      ],
-    });
+    expect(messageCalls(fetchMock).map((call) => call.body)).toEqual([
+      { content: "P1" },
+      { content: "P2" },
+    ]);
   });
 
   it("does not send an empty or too long message", async () => {
@@ -334,8 +330,8 @@ describe("the home chat: failures, stop and retry", () => {
     expect(screen.getAllByText("Pergunta")).toHaveLength(1);
     expect(screen.queryByText("The expert couldn't answer.")).not.toBeInTheDocument();
     expect(messageCalls(fetchMock).map((call) => call.body)).toEqual([
-      { content: "Pergunta", history: [] },
-      { content: "Pergunta", history: [] },
+      { content: "Pergunta" },
+      { content: "Pergunta" },
     ]);
   });
 
@@ -404,7 +400,19 @@ describe("the home chat: failures, stop and retry", () => {
     expect(await screen.findByRole("button", { name: "Send" })).toBeInTheDocument();
   });
 
-  it("aborts the answer and clears the conversation when another expert is chosen", async () => {
+  it("explains 409 CONVERSATION_BUSY and lets the person try again", async () => {
+    stubSessionFetch(sessionOk, () => apiError(409, "CONVERSATION_BUSY"));
+
+    const user = userEvent.setup();
+
+    await openHome();
+    await user.type(textbox(), "Oi{Enter}");
+
+    expect(await screen.findByText("This expert is still answering.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
+  });
+
+  it("aborts the answer and shows the conversation of the new expert when another expert is chosen", async () => {
     const { send } = stubOpenAnswer("Falando");
     const user = userEvent.setup();
 

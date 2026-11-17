@@ -1,6 +1,5 @@
-/** Limits of the contract with `POST /experts/:expertId/messages`. */
+/** The longest message the API accepts from the user. */
 export const MESSAGE_LIMIT = 4000;
-export const HISTORY_LIMIT = 20;
 
 export type ExpertMessageStatus =
   | "streaming"
@@ -8,7 +7,8 @@ export type ExpertMessageStatus =
   | "incomplete"
   | "error"
   | "unavailable"
-  | "rate-limited";
+  | "rate-limited"
+  | "busy";
 
 export interface UserMessage {
   id: string;
@@ -25,31 +25,27 @@ export interface ExpertMessage {
 
 export type ChatMessage = UserMessage | ExpertMessage;
 
-export interface HistoryTurn {
+/** A message as `GET /experts/:expertId/conversation` returns it. */
+export interface StoredMessage {
+  id: string;
   role: "user" | "assistant";
   content: string;
+  status: "complete" | "incomplete";
+  createdAt: string;
 }
 
-/**
- * What the API receives as `history`: the last 20 turns that make sense as context. Answers
- * that failed or have no text are left out; each text is cut to the 4,000 characters the API
- * accepts (an answer can be longer than that).
- */
-export function buildHistory(messages: readonly ChatMessage[]): HistoryTurn[] {
-  const turns: HistoryTurn[] = [];
-
-  for (const message of messages) {
-    if (message.role === "user") {
-      turns.push({ role: "user", content: message.content.slice(0, MESSAGE_LIMIT) });
-    } else if (
-      (message.status === "done" || message.status === "incomplete") &&
-      message.content !== ""
-    ) {
-      turns.push({ role: "assistant", content: message.content.slice(0, MESSAGE_LIMIT) });
-    }
-  }
-
-  return turns.slice(-HISTORY_LIMIT);
+/** The conversation read from the server, as the list the chat shows (the expert is `assistant`). */
+export function fromStoredMessages(stored: readonly StoredMessage[]): ChatMessage[] {
+  return stored.map((message): ChatMessage =>
+    message.role === "user"
+      ? { id: message.id, role: "user", content: message.content }
+      : {
+          id: message.id,
+          role: "expert",
+          content: message.content,
+          status: message.status === "incomplete" ? "incomplete" : "done",
+        },
+  );
 }
 
 export type ChatAction =
@@ -57,9 +53,11 @@ export type ChatAction =
   | { type: "delta"; id: string; text: string }
   | { type: "finished"; id: string }
   | { type: "stopped"; id: string }
-  | { type: "failed"; id: string; status: "error" | "unavailable" | "rate-limited" }
+  | { type: "failed"; id: string; status: "error" | "unavailable" | "rate-limited" | "busy" }
   /** Drops the failed answer and puts a new empty one in its place, for "Try again". */
-  | { type: "retried"; id: string; newId: string };
+  | { type: "retried"; id: string; newId: string }
+  /** The conversation was deleted on the server. */
+  | { type: "cleared" };
 
 function patchExpert(
   messages: readonly ChatMessage[],
@@ -100,5 +98,7 @@ export function chatReducer(messages: ChatMessage[], action: ChatAction): ChatMe
           ? { id: action.newId, role: "expert", content: "", status: "streaming" }
           : message,
       );
+    case "cleared":
+      return [];
   }
 }

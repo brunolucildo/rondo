@@ -17,6 +17,8 @@ export interface ComposerProps {
   draft: string;
   onDraftChange: (draft: string) => void;
   isAnswering: boolean;
+  /** The conversation is not ready (loading or failed to load): the dropdown still works. */
+  disabled?: boolean;
   onSend: (content: string) => void;
   onStop: () => void;
 }
@@ -33,6 +35,7 @@ export function Composer({
   draft,
   onDraftChange,
   isAnswering,
+  disabled = false,
   onSend,
   onStop,
 }: ComposerProps) {
@@ -44,7 +47,7 @@ export function Composer({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const message = draft.trim();
   const tooLong = message.length > MESSAGE_LIMIT;
-  const canSend = message !== "" && !tooLong && !isAnswering;
+  const canSend = message !== "" && !tooLong && !isAnswering && !disabled;
   const describedBy =
     [tooLong ? limitId : null, expert.notice === null ? null : noticeId]
       .filter(Boolean)
@@ -122,6 +125,7 @@ export function Composer({
               onChange={(event) => onDraftChange(event.target.value)}
               onKeyDown={handleKeyDown}
               placeholder={`Ask the ${expert.name}…`}
+              disabled={disabled}
               aria-invalid={tooLong ? true : undefined}
               aria-describedby={describedBy}
               className="max-h-40 overflow-y-auto"

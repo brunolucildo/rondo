@@ -6,7 +6,13 @@ const TRACER_NAME = "rondo-api";
 export type ExpertMessageOutcome = "success" | "failure" | "aborted";
 
 /** Closed set: the reason of a failure or an abort, never text from the client or the provider. */
-export type ExpertMessageReason = "none" | "provider_error" | "timeout" | "aborted" | "unavailable";
+export type ExpertMessageReason =
+  | "none"
+  | "provider_error"
+  | "timeout"
+  | "aborted"
+  | "unavailable"
+  | "storage_error";
 
 export interface ExpertMessageResult {
   outcome: ExpertMessageOutcome;
