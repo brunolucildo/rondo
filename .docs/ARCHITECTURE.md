@@ -255,7 +255,7 @@ Bearer JWT cujo `sid` é conferido no banco a cada request; **sessão única por
 
 ### 4.8 Conhecimento: índice vetorial e embeddings (`apps/api/src/modules/knowledge`, spec `0022`)
 
-Fundação do RAG dos experts: guarda os trechos (chunks) dos documentos conectados e os devolve por similaridade. Só infraestrutura e contrato; upload e chunking são da 0023, a busca no chat da 0024 e a exclusão pela interface da 0025. O `KnowledgeModule` existe, mas **ainda não é importado pelo `AppModule`** (sem consumidor); a spec que o usar o registra. Decisão no ADR `XXXX-0022-weaviate-com-multi-tenancy-por-usuario` (número provisório).
+Fundação do RAG dos experts: guarda os trechos (chunks) dos documentos conectados e os devolve por similaridade. Só infraestrutura e contrato; upload e chunking são da 0023, a busca no chat da 0024 e a exclusão pela interface da 0025. O `KnowledgeModule` existe, mas **ainda não é importado pelo `AppModule`** (sem consumidor); a spec que o usar o registra. Decisão no ADR `0020-weaviate-com-multi-tenancy-por-usuario`.
 
 | Camada           | Conteúdo                                                                                                                                                                                                                                                                                                                  |
 | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -289,7 +289,7 @@ Fundação do RAG dos experts: guarda os trechos (chunks) dos documentos conecta
 | Auth própria na API (Nest + Postgres), Argon2id | Sessão única, e-mails próprios e identidade no domínio — ADR 0007 | Sem provedor de identidade externo; segurança de credenciais é nossa (§4.6)                      |
 | `pg` + funções SQL por `select`, dois roles | Transação no banco, sem CLI nem PostgREST — ADR 0015 | `rondo_app` sem DDL; segurança por `grant`, sem RLS |
 | Sessão: bearer JWT com `sid` conferido no banco | Sessão única e revogação imediata — ADR 0009                      | API fechada por padrão; uma leitura por request; token em `localStorage` (§4.7) |
-| Weaviate com um tenant por usuário; vetores calculados pela aplicação | Isolamento estrutural de dados sensíveis e nenhuma chamada de provedor pelo servidor — ADR `XXXX-0022` (provisório) | Imagem fixada em 1.40.5, sem módulos, só `127.0.0.1` e API key; o domínio só vê portas (§4.8) |
+| Weaviate com um tenant por usuário; vetores calculados pela aplicação | Isolamento estrutural de dados sensíveis e nenhuma chamada de provedor pelo servidor — ADR `0020` | Imagem fixada em 1.40.5, sem módulos, só `127.0.0.1` e API key; o domínio só vê portas (§4.8) |
 
 ADRs vivem em `./.adrs/` (`0001` a `0016`). Crie `./.adrs/NNNN-titulo.md` ao tomar decisões estruturais (template em `RULES.md`).
 

@@ -53,7 +53,7 @@ Weaviate 1.40.5 por HTTP 8080 e gRPC 50051 (`weaviate-client` 3.15.3, `@langchai
 
 ## Arquivos previstos
 
-`docker-compose.yml`, `scripts/infra-*.ts`, `.env.example`, `apps/api/src/modules/knowledge/**`, `apps/api/src/observability/knowledge-telemetry.ts`, `apps/api/test/knowledge-*.int-spec.ts`, `.docs/ARCHITECTURE.md`, `.docs/QA.md`, `.adrs/XXXX-0022-weaviate-multi-tenancy-por-usuario.md`.
+`docker-compose.yml`, `scripts/infra-*.ts`, `.env.example`, `apps/api/src/modules/knowledge/**`, `apps/api/src/observability/knowledge-telemetry.ts`, `apps/api/test/knowledge-*.int-spec.ts`, `.docs/ARCHITECTURE.md`, `.docs/QA.md`, `.adrs/0020-weaviate-com-multi-tenancy-por-usuario.md`.
 
 ## Testes
 

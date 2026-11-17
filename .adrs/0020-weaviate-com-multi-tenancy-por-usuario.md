@@ -1,8 +1,8 @@
-# XXXX — Weaviate com multi-tenancy por usuário e vetores calculados pela aplicação
+# 0020 — Weaviate com multi-tenancy por usuário e vetores calculados pela aplicação
 
 - **Status:** aceito
 - **Data:** 2026-11-17
-- **Spec:** `.specs/0022-rag-weaviate-foundation.md` (o número `XXXX` é provisório; o orquestrador renumera)
+- **Spec:** `.specs/0022-rag-weaviate-foundation.md`
 
 ## Contexto
 
