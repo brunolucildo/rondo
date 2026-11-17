@@ -60,7 +60,7 @@ R1 a R10 da spec; os critérios de aceite valem sem alteração.
 
 ## Arquivos previstos
 
-`db/migrations/*_add_expert_message_citations.sql`; `apps/api/src/modules/experts/**` (domínio, caso de uso, grafo, adaptadores, DTO, handler, SSE, presenter); `apps/api/src/modules/connections/{index.ts,connections.module.ts,domain/connection-ports.ts,infrastructure/postgres-connection.repository.ts,testing/in-memory-connection.repository.ts}` (export e consulta `ready`, aditivos); `apps/api/src/config/environment.ts`; `apps/api/src/observability/expert-telemetry.ts`; `apps/api/test/*`; `apps/app/src/features/{experts,connections}/**`; `e2e/experts-grounded-answers.spec.ts`; `.env.example`; `.docs/*`; `.adrs/0025-0024-recuperacao-e-citacoes-do-servidor.md`.
+`db/migrations/*_add_expert_message_citations.sql`; `apps/api/src/modules/experts/**` (domínio, caso de uso, grafo, adaptadores, DTO, handler, SSE, presenter); `apps/api/src/modules/connections/{index.ts,connections.module.ts,domain/connection-ports.ts,infrastructure/postgres-connection.repository.ts,testing/in-memory-connection.repository.ts}` (export e consulta `ready`, aditivos); `apps/api/src/config/environment.ts`; `apps/api/src/observability/expert-telemetry.ts`; `apps/api/test/*`; `apps/app/src/features/{experts,connections}/**`; `e2e/experts-grounded-answers.spec.ts`; `.env.example`; `.docs/*`; `.adrs/0025-recuperacao-e-citacoes-do-servidor.md`.
 
 ## Testes
 
@@ -79,7 +79,7 @@ R1 a R10 da spec; os critérios de aceite valem sem alteração.
 
 - [x] R1 a R10 atendidos e cobertos por teste.
 - [x] `lint`, `check-types`, `build`, `test`, `test:integration` e `test:e2e` sem chamar a OpenAI (o `test` do api tem as 3 falhas de baseline).
-- [x] `ARCHITECTURE.md`, `BUSINESS.md` e `QA.md` atualizados; ADR registrado (`.adrs/0025-0024-recuperacao-e-citacoes-do-servidor.md`, número provisório).
+- [x] `ARCHITECTURE.md`, `BUSINESS.md` e `QA.md` atualizados; ADR registrado (`.adrs/0025-recuperacao-e-citacoes-do-servidor.md`).
 
 ## Perguntas abertas
 

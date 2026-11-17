@@ -1,6 +1,6 @@
 # 0025 — Recuperação nas respostas dos experts e citações montadas pelo servidor
 
-- **Status:** aceito (número provisório: o orquestrador renumera; a spec de origem é a `0024`)
+- **Status:** aceito (decisão da spec `0024`)
 - **Data:** 2026-11-17
 
 ## Contexto
