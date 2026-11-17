@@ -101,6 +101,43 @@ describe("PostgresConversationRepository.listPage", () => {
   });
 });
 
+describe("PostgresConversationRepository.listPage: citations", () => {
+  it("returns null, an empty list or the four known fields of each citation", async () => {
+    const { repository } = repositoryWith({
+      rows: [
+        row(3, {
+          citations: [
+            {
+              connectionId: MESSAGE_ID,
+              sourceName: "plano.pdf",
+              page: 2,
+              position: 1,
+              text: "leaked chunk text",
+            },
+          ],
+        }),
+        row(2, { citations: [] }),
+        row(1),
+      ],
+    });
+    const page = await repository.listPage(USER_ID, "head-coach", { limit: 5, before: null });
+
+    expect(page.messages.map((message) => message.citations)).toEqual([
+      null,
+      [],
+      [{ connectionId: MESSAGE_ID, sourceName: "plano.pdf", page: 2, position: 1 }],
+    ]);
+  });
+
+  it("refuses a stored value that is not a list of well-formed citations", async () => {
+    const { repository } = repositoryWith({ rows: [row(1, { citations: [{ sourceName: 1 }] })] });
+
+    await expect(
+      repository.listPage(USER_ID, "head-coach", { limit: 5, before: null }),
+    ).rejects.toThrow("list_messages (UNEXPECTED_RESULT)");
+  });
+});
+
 describe("PostgresConversationRepository.append", () => {
   it("calls expert_append_message with every value bound and the retention limit of 200", async () => {
     const { repository, query } = repositoryWith({
@@ -116,9 +153,53 @@ describe("PostgresConversationRepository.append", () => {
     ).resolves.toEqual({ id: MESSAGE_ID, createdAt: new Date("2026-11-17T12:00:00.000Z") });
     expect(query).toHaveBeenCalledWith(
       { operation: "rpc", procedure: "expert_append_message" },
-      "select message_id, message_created_at from public.expert_append_message($1, $2, $3, $4, $5, $6)",
-      [USER_ID, "physiologist", "assistant", "texto parcial", "incomplete", 200],
+      "select message_id, message_created_at from public.expert_append_message($1, $2, $3, $4, $5, $6, $7::jsonb)",
+      [USER_ID, "physiologist", "assistant", "texto parcial", "incomplete", 200, null],
     );
+  });
+
+  it("binds the citations as JSON, only the four known fields, never a chunk text", async () => {
+    const { repository, query } = repositoryWith({
+      rows: [{ message_id: MESSAGE_ID, message_created_at: new Date("2026-11-17T12:00:00.000Z") }],
+    });
+    const citations = [
+      { connectionId: MESSAGE_ID, sourceName: "plano.pdf", page: 3, position: 7 },
+      { connectionId: USER_ID, sourceName: "notas.md", page: null, position: 0 },
+    ];
+
+    await repository.append(USER_ID, "head-coach", {
+      role: "assistant",
+      content: "resposta",
+      status: "complete",
+      citations,
+    });
+
+    const [, , values] = query.mock.calls[0] as [unknown, string, unknown[]];
+
+    expect(JSON.parse(String(values[6]))).toEqual(citations);
+    expect(Object.keys(JSON.parse(String(values[6]))[0] as object).sort()).toEqual([
+      "connectionId",
+      "page",
+      "position",
+      "sourceName",
+    ]);
+  });
+
+  it("stores an empty list as an empty JSON array (the gap), distinct from no citations", async () => {
+    const { repository, query } = repositoryWith({
+      rows: [{ message_id: MESSAGE_ID, message_created_at: new Date("2026-11-17T12:00:00.000Z") }],
+    });
+
+    await repository.append(USER_ID, "head-coach", {
+      role: "assistant",
+      content: "resposta",
+      status: "complete",
+      citations: [],
+    });
+
+    const [, , values] = query.mock.calls[0] as [unknown, string, unknown[]];
+
+    expect(values[6]).toBe("[]");
   });
 
   it("fails when the function returns an unexpected shape", async () => {

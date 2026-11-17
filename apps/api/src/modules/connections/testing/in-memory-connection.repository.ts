@@ -33,6 +33,12 @@ export class InMemoryConnectionRepository implements ConnectionRepository {
     return Promise.resolve([...this.rows.values()].filter((row) => row.userId === userId).length);
   }
 
+  hasReadyConnection(userId: string): Promise<boolean> {
+    return Promise.resolve(
+      [...this.rows.values()].some((row) => row.userId === userId && row.status === "ready"),
+    );
+  }
+
   insertProcessing(userId: string, connection: NewConnection): Promise<InsertedConnection> {
     // No `await` between the lookup and the insert: like the unique index, one caller wins.
     const existing = [...this.rows.values()].find(

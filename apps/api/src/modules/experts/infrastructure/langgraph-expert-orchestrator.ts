@@ -7,6 +7,7 @@ import {
   SystemMessage,
 } from "@langchain/core/messages";
 import {
+  Annotation,
   END,
   type LangGraphRunnableConfig,
   MessagesAnnotation,
@@ -14,12 +15,22 @@ import {
   StateGraph,
 } from "@langchain/langgraph";
 import type { ModelMessage } from "../domain/expert-conversation";
-import { ExpertModelError } from "../domain/expert-errors";
+import { ExpertKnowledgeUnavailableError, ExpertModelError } from "../domain/expert-errors";
 import type {
   ExpertOrchestrator,
+  KnowledgeRetriever,
   OrchestratorEvent,
   OrchestratorInput,
+  RetrievalRequest,
 } from "../domain/expert-ports";
+import { applyGrounding, buildCitations, type Grounding } from "../domain/grounding";
+
+/** The graph state: the typed messages, what to retrieve and what the retrieval found. */
+const ExpertState = Annotation.Root({
+  ...MessagesAnnotation.spec,
+  retrieval: Annotation<RetrievalRequest | null>(),
+  grounding: Annotation<Grounding | null>(),
+});
 
 function toLangChainMessage(message: ModelMessage): BaseMessage {
   switch (message.role) {
@@ -29,6 +40,20 @@ function toLangChainMessage(message: ModelMessage): BaseMessage {
       return new HumanMessage(message.content);
     case "assistant":
       return new AIMessage(message.content);
+  }
+}
+
+/** A typed LangChain message back as a plain one (only `system`, `human` and `ai` exist here). */
+function toModelMessage(message: BaseMessage): ModelMessage {
+  const content = typeof message.content === "string" ? message.content : "";
+
+  switch (message.type) {
+    case "system":
+      return { role: "system", content };
+    case "ai":
+      return { role: "assistant", content };
+    default:
+      return { role: "user", content };
   }
 }
 
@@ -52,6 +77,10 @@ function isOrchestratorEvent(value: unknown): value is OrchestratorEvent {
 
   if (value.type === "text") {
     return "text" in value && typeof value.text === "string";
+  }
+
+  if (value.type === "citations") {
+    return "citations" in value && Array.isArray(value.citations);
   }
 
   return value.type === "usage" && "usage" in value;
@@ -78,23 +107,58 @@ export function toExpertModelError(error: unknown): ExpertModelError {
 }
 
 /**
- * The expert's LangGraph.js graph: `START → respond → END`. The `respond` node streams the chat
- * model and writes each piece to the `custom` stream, which is the contract with the use case
- * (`text` and `usage` events). Later specs add nodes (retrieval, citations) around `respond`
- * without changing that contract. The model is injected: OpenAI in production, a fake in tests.
+ * The expert's LangGraph.js graph: `START → retrieve → respond → END`.
+ *
+ * `retrieve` looks for chunks of the user's connected documents (a `KnowledgeRetriever`) and, as
+ * soon as it ends, writes the server-built citations to the `custom` stream. It does nothing when
+ * the request carries no retrieval (the user has no ready connection). `respond` adds the grounding
+ * rules and the retrieved material, as data, to the system prompt, streams the chat model and
+ * writes each piece to the `custom` stream. That stream is the contract with the use case (`text`,
+ * `usage` and `citations` events). The model is injected: OpenAI in production, a fake in tests.
+ * A failure of the retrieval is thrown as `ExpertKnowledgeUnavailableError`, never swallowed.
  */
 export class LangGraphExpertOrchestrator implements ExpertOrchestrator {
   readonly available = true;
   private readonly graph;
 
-  constructor(model: BaseChatModel) {
-    const respond = async (
-      state: typeof MessagesAnnotation.State,
+  constructor(model: BaseChatModel, retriever?: KnowledgeRetriever) {
+    const retrieve = async (
+      state: typeof ExpertState.State,
       config: LangGraphRunnableConfig,
-    ) => {
-      let answer: AIMessageChunk | undefined;
+    ): Promise<{ grounding: Grounding | null }> => {
+      const request = state.retrieval;
 
-      for await (const chunk of await model.stream(state.messages, config)) {
+      if (request === null || request === undefined) {
+        return { grounding: null };
+      }
+
+      if (retriever === undefined) {
+        throw new ExpertKnowledgeUnavailableError();
+      }
+
+      const chunks = await retriever.retrieve(
+        request,
+        config.signal ?? new AbortController().signal,
+      );
+
+      config.writer?.({
+        type: "citations",
+        citations: buildCitations(chunks),
+      } satisfies OrchestratorEvent);
+
+      return { grounding: { chunks, scoped: request.connectionIds !== null } };
+    };
+
+    const respond = async (state: typeof ExpertState.State, config: LangGraphRunnableConfig) => {
+      let answer: AIMessageChunk | undefined;
+      const prompt =
+        state.grounding === null || state.grounding === undefined
+          ? state.messages
+          : applyGrounding(state.messages.map(toModelMessage), state.grounding).map(
+              toLangChainMessage,
+            );
+
+      for await (const chunk of await model.stream(prompt, config)) {
         answer = answer === undefined ? chunk : answer.concat(chunk);
 
         const text = textOf(chunk);
@@ -116,17 +180,23 @@ export class LangGraphExpertOrchestrator implements ExpertOrchestrator {
       return { messages: answer === undefined ? [] : [answer] };
     };
 
-    this.graph = new StateGraph(MessagesAnnotation)
+    this.graph = new StateGraph(ExpertState)
+      .addNode("retrieve", retrieve)
       .addNode("respond", respond)
-      .addEdge(START, "respond")
+      .addEdge(START, "retrieve")
+      .addEdge("retrieve", "respond")
       .addEdge("respond", END)
       .compile();
   }
 
-  async *answer({ messages, signal }: OrchestratorInput): AsyncGenerator<OrchestratorEvent> {
+  async *answer({
+    messages,
+    retrieval,
+    signal,
+  }: OrchestratorInput): AsyncGenerator<OrchestratorEvent> {
     try {
       const stream = await this.graph.stream(
-        { messages: messages.map(toLangChainMessage) },
+        { messages: messages.map(toLangChainMessage), retrieval: retrieval ?? null },
         { streamMode: "custom", signal },
       );
 
@@ -136,7 +206,7 @@ export class LangGraphExpertOrchestrator implements ExpertOrchestrator {
         }
       }
     } catch (error) {
-      throw toExpertModelError(error);
+      throw error instanceof ExpertKnowledgeUnavailableError ? error : toExpertModelError(error);
     }
   }
 }

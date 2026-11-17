@@ -21,6 +21,8 @@ export interface ConnectionRepository {
   findById(userId: string, connectionId: string): Promise<Connection | null>;
   findByContentHash(userId: string, contentHash: string): Promise<Connection | null>;
   countByUser(userId: string): Promise<number>;
+  /** True when the user has at least one `ready` connection (what the experts may search). */
+  hasReadyConnection(userId: string): Promise<boolean>;
   /** Inserts as `processing`; on a duplicate `(user, hash)` returns the existing row, `created: false`. */
   insertProcessing(userId: string, connection: NewConnection): Promise<InsertedConnection>;
   /** `failed` to `processing`, atomically; `null` when it is no longer `failed` (someone else took it). */

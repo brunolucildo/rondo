@@ -1,6 +1,7 @@
 import { Alert } from "@repo/ui/alert";
 import { Button } from "@repo/ui/button";
 import { useEffect, useRef } from "react";
+import { useAttachments } from "../connections/use-attachments";
 import { type ChatMessage, fromStoredMessages } from "./chat-state";
 import { ClearConversation } from "./clear-conversation";
 import { Composer } from "./composer";
@@ -51,7 +52,17 @@ function ExpertConversation({
   onDraftChange,
   initialMessages,
 }: ExpertConversationProps) {
-  const chat = useExpertChat(expert.id, initialMessages);
+  const attachments = useAttachments();
+  const chat = useExpertChat(expert.id, initialMessages, {
+    // The server took the message: the files were used, the chips go.
+    onAccepted: attachments.clearSettled,
+    // The server refused a file: the message did not go. The text comes back to the field and the
+    // chips say what to do.
+    onAttachmentProblem: (problem, content) => {
+      attachments.flagProblem(problem);
+      onDraftChange(content);
+    },
+  });
   const endRef = useRef<HTMLDivElement>(null);
   const followRef = useRef(true);
 
@@ -77,7 +88,7 @@ function ExpertConversation({
 
   function ask(question: string) {
     followRef.current = true;
-    chat.send(question);
+    chat.send(question, attachments.readyConnectionIds);
   }
 
   return (

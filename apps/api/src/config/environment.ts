@@ -1,5 +1,10 @@
 import { type EmailConfig, parseEmailConfig, resolveNodeEnv } from "../modules/email";
-import { type ExpertChatConfig, parseExpertChatConfig } from "../modules/experts";
+import {
+  type ExpertChatConfig,
+  type ExpertRetrievalConfig,
+  parseExpertChatConfig,
+  parseExpertRetrievalConfig,
+} from "../modules/experts";
 import { MIN_JWT_SECRET_LENGTH } from "./auth-secret";
 import { parseDatabaseUrl } from "./database";
 
@@ -22,6 +27,8 @@ export interface Environment {
   authHashQueueLimit: number;
   /** Chat model of the experts: OpenAI, the scripted fake (`NODE_ENV=test`) or none (no key). */
   expertChat: ExpertChatConfig;
+  /** How many chunks a question retrieves and the similarity threshold (spec 0024). */
+  expertRetrieval: ExpertRetrievalConfig;
 }
 
 const REQUIRED_VARIABLES = ["DATABASE_URL", "APP_URL"] as const;
@@ -142,5 +149,6 @@ export function validateEnvironment(env: Record<string, string | undefined>): En
       0,
     ),
     expertChat: parseExpertChatConfig(env, nodeEnv),
+    expertRetrieval: parseExpertRetrievalConfig(env),
   };
 }

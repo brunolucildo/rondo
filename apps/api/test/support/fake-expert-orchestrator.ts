@@ -1,10 +1,14 @@
-import { ExpertModelError } from "../../src/modules/experts/domain/expert-errors";
+import {
+  ExpertKnowledgeUnavailableError,
+  ExpertModelError,
+} from "../../src/modules/experts/domain/expert-errors";
 import type {
   ExpertOrchestrator,
   OrchestratorEvent,
   OrchestratorInput,
   TokenUsage,
 } from "../../src/modules/experts/domain/expert-ports";
+import type { Citation } from "../../src/modules/experts/domain/grounding";
 
 /** What a fake does for one call: `attempt` is 1 for the first call, 2 for the retry. */
 export type OrchestratorScript = (
@@ -35,6 +39,23 @@ export function speaks(pieces: readonly string[], usage?: TokenUsage): Orchestra
         yield { type: "usage", usage } satisfies OrchestratorEvent;
       }
     })();
+}
+
+/** Reports the citations first (as the retrieval node does) and then runs the script. */
+export function withCitations(
+  citations: readonly Citation[],
+  script: OrchestratorScript,
+): OrchestratorScript {
+  return (input, attempt) =>
+    (async function* () {
+      yield { type: "citations", citations: [...citations] } satisfies OrchestratorEvent;
+      yield* script(input, attempt);
+    })();
+}
+
+/** The retrieval fails before any token, as when the embeddings or the index are down. */
+export function failsKnowledge(): OrchestratorScript {
+  return () => stream(() => Promise.reject(new ExpertKnowledgeUnavailableError()));
 }
 
 /** Fails on the first read, before any token. */

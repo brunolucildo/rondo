@@ -22,6 +22,7 @@ export interface ComposerProps {
   isAnswering: boolean;
   /** The conversation is not ready (loading or failed to load): the dropdown still works. */
   disabled?: boolean;
+  /** Sends the message; the attached files travel with it (the parent reads them). */
   onSend: (content: string) => void;
   onStop: () => void;
 }
@@ -52,8 +53,7 @@ export function Composer({
   const message = draft.trim();
   const tooLong = message.length > MESSAGE_LIMIT;
   // Files still uploading or processing hold the message back until they are ready or removed.
-  const canSend =
-    message !== "" && !tooLong && !isAnswering && !disabled && !attachments.isBusy;
+  const canSend = message !== "" && !tooLong && !isAnswering && !disabled && !attachments.isBusy;
   const describedBy =
     [tooLong ? limitId : null, expert.notice === null ? null : noticeId]
       .filter(Boolean)
@@ -73,9 +73,10 @@ export function Composer({
 
   function submit() {
     if (canSend) {
+      // The chips stay until the server accepts the message (the parent clears them): a file it
+      // refuses must still show its problem.
       onSend(message);
       onDraftChange("");
-      attachments.clearSettled();
     }
   }
 

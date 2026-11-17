@@ -138,6 +138,22 @@ export class PostgresConnectionRepository implements ConnectionRepository {
     return total;
   }
 
+  async hasReadyConnection(userId: string): Promise<boolean> {
+    const [row] = await this.run(
+      "connections_has_ready",
+      { operation: "select", collection: "connections" },
+      "select exists (select 1 from public.connections where user_id = $1 and status = 'ready') as found",
+      [userId],
+    );
+    const found: unknown = row?.found;
+
+    if (typeof found !== "boolean") {
+      throw new DataAccessError("connections_has_ready", "UNEXPECTED_RESULT");
+    }
+
+    return found;
+  }
+
   async insertProcessing(userId: string, connection: NewConnection): Promise<InsertedConnection> {
     const inserted = await this.one(
       "connections_insert",

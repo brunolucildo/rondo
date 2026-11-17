@@ -62,6 +62,41 @@ describe("SendExpertMessageDto (R4, R5)", () => {
     },
   );
 
+  describe("connectionIds (R2)", () => {
+    const A = "6d2f3c1a-9b7e-4d58-8a31-2c4e5f6a7b8c";
+    const B = "7e3a4d2b-0c8f-4e69-9b42-3d5f6a7b8c9d";
+
+    it("is optional and keeps up to 10 distinct UUIDs", async () => {
+      expect((await validate({ content: "oi" })).value?.connectionIds).toBeUndefined();
+      expect(
+        (await validate({ content: "oi", connectionIds: [A, B] })).value?.connectionIds,
+      ).toEqual([A, B]);
+      expect((await validate({ content: "oi", connectionIds: [] })).value?.connectionIds).toEqual(
+        [],
+      );
+
+      const ten = Array.from(
+        { length: 10 },
+        (_, index) => `00000000-0000-4000-8000-${String(index).padStart(12, "0")}`,
+      );
+
+      expect((await validate({ content: "oi", connectionIds: ten })).value).toBeDefined();
+    });
+
+    it("refuses more than 10 ids, repeated ids, non UUIDs and a non-list", async () => {
+      const eleven = Array.from(
+        { length: 11 },
+        (_, index) => `00000000-0000-4000-8000-${String(index).padStart(12, "0")}`,
+      );
+
+      for (const connectionIds of [eleven, [A, A], ["not-a-uuid"], [42], A, { 0: A }]) {
+        expect((await validate({ content: "oi", connectionIds })).details?.[0]).toMatchObject({
+          field: "connectionIds",
+        });
+      }
+    });
+  });
+
   it("rejects any other field: only the content is accepted", async () => {
     expect((await validate({ content: "oi", expertId: "head-coach" })).details).toBeDefined();
     expect((await validate({ content: "oi", userId: "someone" })).details).toBeDefined();
