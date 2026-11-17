@@ -3,7 +3,7 @@
 > Spec executável. Preencha todas as seções; `TODO` é lacuna, não requisito.
 > Use `create-spec` para criar, `refine-spec` para auditar e `implement-me` para executar.
 
-- **Status:** pronta
+- **Status:** concluída (R1 a R9 atendidos; pendentes só `infra:reset` real, que não foi rodado para não apagar o Postgres dos outros worktrees, e a dívida pré-existente de `session.service.spec.ts` no `test`)
 - **Slug:** 0022-rag-weaviate-foundation
 - **Data:** 2026-11-17
 - **Atualizado em:** 2026-11-17
@@ -72,17 +72,17 @@
 
 ## 6. Acceptance Criteria
 
-- [ ] Given `docker compose config`, Then a imagem do Weaviate tem tag fixa, as portas são `127.0.0.1:` e o acesso anônimo está desligado.
-- [ ] Given `bun run infra:up`, Then o Weaviate fica saudável e sem a chave de API uma chamada recebe 401.
+- [x] Given `docker compose config`, Then a imagem do Weaviate tem tag fixa, as portas são `127.0.0.1:` e o acesso anônimo está desligado.
+- [x] Given `bun run infra:up`, Then o Weaviate fica saudável e sem a chave de API uma chamada recebe 401.
 - [ ] Given `bun run infra:reset`, Then o volume do Weaviate é apagado e o serviço volta vazio.
-- [ ] Given dois usuários com o mesmo texto, Then a busca de um nunca devolve chunks do outro.
-- [ ] Given `deleteByConnection` e `deleteAllForUser`, Then removem o que devem e são idempotentes.
-- [ ] Given um tenant inexistente, Then a busca devolve `[]` e não cria o tenant.
-- [ ] Given 200 textos, Then os embeddings saem em 3 chamadas; given 429 repetido, Then há 3 tentativas e `EmbeddingsUnavailableError`.
-- [ ] Given o Weaviate parado, Then `KnowledgeIndexUnavailableError` dentro do timeout, sem detalhes de rede no erro público.
-- [ ] Given o sentinela, Then nenhum log, span ou métrica contém texto, vetor, `userId` ou nome de tenant.
-- [ ] Given `domain/`, Then não importa Weaviate nem LangChain.
-- [ ] Given o Weaviate parado, Then só os testes de integração do módulo `knowledge` falham, com a instrução de rodar `bun run infra:up`; os demais testes de integração continuam passando.
+- [x] Given dois usuários com o mesmo texto, Then a busca de um nunca devolve chunks do outro.
+- [x] Given `deleteByConnection` e `deleteAllForUser`, Then removem o que devem e são idempotentes.
+- [x] Given um tenant inexistente, Then a busca devolve `[]` e não cria o tenant.
+- [x] Given 200 textos, Then os embeddings saem em 3 chamadas; given 429 repetido, Then há 3 tentativas e `EmbeddingsUnavailableError`.
+- [x] Given o Weaviate parado, Then `KnowledgeIndexUnavailableError` dentro do timeout, sem detalhes de rede no erro público.
+- [x] Given o sentinela, Then nenhum log, span ou métrica contém texto, vetor, `userId` ou nome de tenant.
+- [x] Given `domain/`, Then não importa Weaviate nem LangChain.
+- [x] Given o Weaviate parado, Then só os testes de integração do módulo `knowledge` falham, com a instrução de rodar `bun run infra:up`; os demais testes de integração continuam passando.
 - [ ] Given `bun run lint`, `check-types`, `test` e `test:integration` (com o Weaviate local), Then passam; os testes não chamam a OpenAI.
 
 ## 7. O que fazer
@@ -143,3 +143,4 @@ Como validar que a spec foi atendida:
 | ---------- | ---------------------- | ----------------------------------------------- |
 | 2026-11-17 | Spec criada (rascunho) | Quebra do épico de experts (`breakdown-specs`). |
 | 2026-11-17 | R9 (ADR e documentação) promovido a Must; critério e passo de teste ajustados para o Weaviate só ser exigido nos testes do módulo `knowledge`; premissa de testes | `RULES.md` §5 exige ADR para tecnologia nova; o `globalSetup` atual exige o banco e uma dependência nova quebraria `test:integration` sem Weaviate |
+| 2026-11-17 | Spec implementada | `implement-me`: serviço `weaviate` 1.40.5 no Compose, módulo `knowledge` (portas, adaptadores, fakes, telemetria), ADR provisório `XXXX-0022`, docs e testes de integração contra o Weaviate local. O `KnowledgeModule` não entra no `AppModule` (sem consumidor); `WEAVIATE_URL`/`WEAVIATE_API_KEY` só são exigidas quando o módulo é carregado |
