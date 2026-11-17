@@ -3,7 +3,7 @@
 > Spec executável. Preencha todas as seções; `TODO` é lacuna, não requisito.
 > Use `create-spec` para criar, `refine-spec` para auditar e `implement-me` para executar.
 
-- **Status:** em implementação (pendente: geração real e aprovação dos 7 PNGs; ver plano)
+- **Status:** concluída (7 avatares gerados com `gpt-image-2` e aprovados em 2026-11-17)
 - **Slug:** 0021-experts-avatars-pixel-art
 - **Data:** 2026-11-17
 - **Atualizado em:** 2026-11-17
