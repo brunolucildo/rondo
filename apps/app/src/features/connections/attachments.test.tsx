@@ -66,6 +66,10 @@ async function openHome() {
 
   await screen.findByRole("heading", { level: 1, name: HOME_HEADING });
   await screen.findByRole("combobox", { name: "Expert" });
+  // The composer stays disabled (and is rebuilt) until the stored conversation has loaded.
+  await waitFor(() =>
+    expect(screen.getByRole("textbox", { name: /^Message for the/ })).toBeEnabled(),
+  );
 }
 
 const fileInput = () => screen.getByTestId("connection-file-input");
