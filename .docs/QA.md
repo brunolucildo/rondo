@@ -169,6 +169,7 @@ Verificação manual de UI (`/auth/confirm-account` e `/auth/resend-confirmation
 | Bun 1.4.4 e Node >= 24 | Instalação local                                                                                                                                              |
 | Docker em execução     | Necessário para `infra:up`, `db:migrate`, `test:integration` e `test:e2e`; lint, tipos, build e `test` não dependem dele                                      |
 | Postgres local         | Docker (`bun run infra:up`); a imagem `postgres:17-alpine` é baixada na primeira vez                                                                          |
+| Weaviate local         | Docker (`bun run infra:up`); a imagem `cr.weaviate.io/semitechnologies/weaviate:1.40.5` é baixada na primeira vez; só os testes do módulo `knowledge` o exigem |
 | Browsers do Playwright | `bunx playwright install` (uma vez)                                                                                                                           |
 | `.env` na raiz         | Copie `.env.example`; `DATABASE_URL` e `DATABASE_MIGRATOR_URL` já apontam para o Postgres local (`rondo`/`rondo`, credenciais públicas só de desenvolvimento) |
 
@@ -196,9 +197,9 @@ Outros comandos:
 | `bun run test:coverage` | Vitest com cobertura em `coverage/` (sem threshold nesta fase)                                                                                     |
 | `bun run format`        | OXFmt escreve nos arquivos; escopo limitado por `.oxfmtrc.json`                                                                                    |
 | `bun run code:fix`      | `oxlint --fix` e `oxfmt --write`                                                                                                                   |
-| `bun run infra:up`      | `docker compose up -d --build --wait` (até 300 s): Postgres e LGTM; sai != 0 se algo falhar e mantém o que subiu                                   |
-| `bun run infra:down`    | `docker compose down`; preserva o volume `postgres-data`; idempotente                                                                              |
-| `bun run infra:reset`   | `docker compose down -v` + `infra:up`: **apaga** o volume do Postgres local e avisa; rode `db:migrate` depois                                      |
+| `bun run infra:up`      | `docker compose up -d --build --wait` (até 300 s): Postgres, Weaviate e LGTM; sai != 0 se algo falhar e mantém o que subiu                         |
+| `bun run infra:down`    | `docker compose down`; preserva os volumes `postgres-data` e `weaviate-data`; idempotente                                                          |
+| `bun run infra:reset`   | `docker compose down -v` + `infra:up`: **apaga** os volumes do Postgres e do Weaviate locais e avisa; rode `db:migrate` depois                     |
 | `bun run db:migrate`    | Runner próprio (`scripts/db-migrate.ts`): aplica `db/migrations` em ordem, uma transação por arquivo, checksum em `schema_migrations`; idempotente |
 | `bun run hooks:install` | `lefthook install` (grava `.git/hooks`; rode uma vez em cada clone)                                                                                |
 
@@ -228,8 +229,11 @@ bun run dev
 | `apps/api`                 | http://localhost:3002                         | 3002  |
 | Grafana                    | http://localhost:3000 (admin/admin, só local) | 3000  |
 | Postgres                   | localhost:5432 (banco `rondo`)                | 5432  |
+| Weaviate (HTTP / gRPC)     | http://localhost:8080 (só com a API key), gRPC 50051; só em `127.0.0.1` | 8080 / 50051 |
 
 Para subir um app isolado: `bun run dev --filter=app`, `--filter=api` ou `--filter=docs`.
+
+**Weaviate (spec `0022`):** com `bun run infra:up`, `docker compose ps weaviate` deve mostrar `healthy`. Valide o isolamento de acesso: `curl -i http://localhost:8080/v1/schema` responde 401 e, com `-H "Authorization: Bearer $WEAVIATE_API_KEY"` (o padrão de desenvolvimento está em `.env.example`), 200. `docker compose config` mostra a imagem com tag fixa (`1.40.5`), as portas `127.0.0.1:8080` e `127.0.0.1:50051` e `AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: "false"`. Os testes do índice (`apps/api/test/knowledge-weaviate.int-spec.ts`) usam a coleção `KnowledgeChunkTest`, embeddings falsos e nunca chamam a OpenAI; com o Weaviate parado só eles falham, com a instrução de rodar `bun run infra:up`. A métrica de busca (10 mil chunks em até 300 ms) é opcional: `KNOWLEDGE_PERF=1 bun run test:integration` em `apps/api` (leva alguns minutos para gravar os chunks).
 
 **E2E de autenticação** (`sign-up`, `confirm-account`, `sign-in`...): exige `bun run infra:up` e `bun run db:migrate` (Postgres local, usado para semear contas por SQL e pelas funções SQL). O `playwright.config.ts` sobe sozinho o app e uma API nova (`NODE_ENV=test`, que liga o provedor `capture`; rate limit em memória zerado, `AUTH_JWT_SECRET` de teste), com a `DATABASE_URL` do banco local; com as portas 5173/3002 ocupadas use `E2E_APP_PORT` e `E2E_API_PORT`.
 
@@ -326,6 +330,7 @@ Aplique apenas o que a mudança afeta, mas registre o que foi verificado.
 - [ ] Com o Collector parado (`docker compose stop otel-collector`), a API continua respondendo.
 - [ ] Observabilidade de auth (spec `0011`), com `infra:up` e a API compilada (`bun run build`; depois, em `apps/api`, `API_PORT=3012 NODE_ENV=test OTEL_SERVICE_NAME=rondo-api node dist/main.js`): faça sign-up, confirmação, sign-in (certo e errado), sign-out, forgot-password (com conta e sem) e reset. Aguarde até ~1 minuto (as métricas saem a cada 15 s) e confirme: no Mimir, `sum by (operation, outcome, reason) (auth_operations_total)` traz uma série por combinação, e `http_server_request_duration_seconds_count` tem `http_route` com templates (`unmatched` para path inexistente e preflight); no Loki, `{service_name="rondo-api"} | event="auth_operation"` traz uma linha por tentativa com `trace_id`; no Tempo, `{ name =~ "auth.*" }` traz `auth.sign_in` dentro do span HTTP, com a falha marcada e só `auth.error_code`. Nada de e-mail, senha, token, IP, `userId` ou `sid` em nenhum dos três. No Grafana, abra "Rondo — Observabilidade da API" (pasta "Rondo") e clique em **Open trace** numa linha de log (derived field); o Tempo deve abrir o trace.
 - [ ] Observabilidade do Postgres (spec `0013`), com `infra:up` (o Postgres local no ar) e a API compilada: **suba-a numa porta livre** (confira antes que nada escuta nela; um `node dist/main.js` esquecido atende no lugar e roda código velho e outro banco) e com a `DATABASE_URL` do Postgres local no ambiente do processo (confira o host: o `.env` de quem desenvolve pode apontar para outro banco). Faça sign-up, sign-in (certo e errado) e forgot-password, espere ~40 s e confirme: no Mimir, `db_client_operation_duration_seconds_count` por `db_operation_name`, `db_collection_name` e `db_stored_procedure_name` (`users`, `auth_sign_up`, `auth_issue_session`…) e `postgresql_backends{job="rondo-postgres"}`; no Tempo, `{ span.db.system.name = "postgresql" }` mostra `select users` e `rpc …` dentro de `auth.*`; e nenhum trace traz o e-mail usado em `span.url.full` ou `span.url.query`, nem `db.statement`, nem `client.address` nos spans de entrada. Nos primeiros ~30 s, `increase()` mostra 0 ou NaN para séries novas (limitação do contador OTLP, ver `ARCHITECTURE.md` §4.4).
+- [ ] Índice de conhecimento (spec `0022`), com `infra:up`: o serviço `weaviate` fica `healthy`, uma chamada sem a chave recebe 401, `docker compose config` não tem `latest` nem porta fora de `127.0.0.1` para ele, e `bun run test:integration` (arquivo `knowledge-weaviate.int-spec.ts`) passa, inclusive o teste de dois usuários com o mesmo texto sem resultado cruzado. Depois de `infra:reset` + `infra:up` o Weaviate volta vazio (`curl -H "Authorization: Bearer <chave>" http://localhost:8080/v1/schema` sem classes). Nenhum log, span ou métrica traz texto de chunk, vetor, `userId`, `connectionId` ou nome de tenant.
 - [ ] Alertas (spec `0012`): depois de `docker compose restart grafana`, em Alerting > Alert rules (pasta "Rondo") as 17 regras aparecem com saúde `ok`. Pare a API por 3 minutos e confira que "API sem telemetria" dispara.
 - [ ] Proteção do hash (spec `0015`): com a API de teste (`bun run load capacity --only=browse,invalidCredentials`), o `session` fica na casa de centenas de ms enquanto o login inválido satura, e as recusas aparecem como 503 `SERVICE_BUSY` (motivo `service_busy`); com `--only=invalidCredentials --api-env=TRUST_PROXY=false` (um IP real, e-mails sempre diferentes) o 61º sign-in em 10 min recebe 429 da política `sign-in-ip`. No dashboard, "Fila de hashes (argon2)" mostra a ocupação e as recusas.
 
@@ -531,3 +536,20 @@ Verificação manual de UI (Chromium via Playwright, `apps/app` em dev, API inte
 Achado do `web-design-guidelines` (regras da Vercel buscadas em 2026-11-16) e correções: `spellCheck={false}` nos campos de e-mail (corrigido); `touch-action: manipulation` no `Button` (corrigido); `transition: all` ausente e transição do `Button` reduzida a `transform` (corrigido). Não aplicados, com motivo: `<meta name="theme-color">` (exigiria hex fora dos primitivos, `DESIGN.md` §10), `preload` das fontes (nomes com hash do bundler; `font-display: swap` cobre) e Title Case nos botões (textos funcionais existentes não mudam, spec §8).
 
 **Não verificado:** leitor de tela; `bun run test:e2e` completo; screenshots do estado "enviando" (a bola em movimento); Safari e Firefox.
+
+### 1.16 Verificação da spec 0022 (Weaviate e embeddings) em 2026-11-17
+
+Executado no worktree da spec, no Windows, com o `rondo-weaviate-1` (1.40.5) e o Postgres local `healthy`.
+
+| Gate                       | Resultado                    | Observação                                                                                                                                                                  |
+| -------------------------- | ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bun run lint`             | Passa                        | 4 tasks, 0 warnings, 0 erros                                                                                                                                                |
+| `bun run check-types`      | Passa                        | `api`: `tsc --noEmit` sem erro                                                                                                                                              |
+| `bun run build`            | Passa                        | `app`, `api` e `docs`                                                                                                                                                       |
+| `bun run test` (`api`)     | **3 falhas, fora do escopo** | 528 de 531 passam; as 3 falhas são de `session.service.spec.ts` (dívida §6 #6, data fixa); os testes novos do módulo `knowledge` passam                                      |
+| `bun run test:integration` | Passa                        | 231 testes (16 arquivos) com o Weaviate local; com o Weaviate parado, só `knowledge-weaviate.int-spec.ts` falha (instrução de rodar `bun run infra:up`) e os outros 212 passam |
+| Métrica de busca           | Passa                        | `KNOWLEDGE_PERF=1`: busca sobre 10 mil chunks abaixo de 300 ms em cada uma de 10 chamadas                                                                                   |
+
+`curl` sem chave em `/v1/schema` responde 401 e com a chave 200; `/v1/meta` lista zero módulos; as portas 8080 e 50051 escutam só em `127.0.0.1`.
+
+**Não verificado:** `infra:reset` ao vivo (apagaria o Postgres dos outros worktrees da execução paralela; o comando só estende o `down -v` existente, e o volume `weaviate-data` está declarado no Compose); `test:e2e` (sem UI nem endpoint nesta spec); chamada real à OpenAI (os testes usam o gerador falso).

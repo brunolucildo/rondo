@@ -13,4 +13,4 @@ if (composeCode !== 0) {
   process.exit(1);
 }
 
-console.log("\nInfra parada. O volume do Postgres foi preservado.");
+console.log("\nInfra parada. Os volumes do Postgres e do Weaviate foram preservados.");
