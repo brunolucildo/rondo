@@ -1,6 +1,6 @@
-# XXXX — Avatares dos experts gerados uma vez por uma ferramenta de desenvolvimento
+# 0022 — Avatares dos experts gerados uma vez por uma ferramenta de desenvolvimento
 
-- **Status:** aceito (número provisório; o orquestrador renumera)
+- **Status:** aceito
 - **Data:** 2026-11-17
 - **Spec:** `0021-experts-avatars-pixel-art`
 

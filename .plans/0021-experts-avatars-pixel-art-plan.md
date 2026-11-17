@@ -31,7 +31,7 @@ R1 a R8 da spec. R7 (aprovação) e a parte de R1/R5 que exige os 7 arquivos dep
 - Decisão: `<select>` nativo não mostra imagem nas opções; o "dropdown" mostra o avatar do expert selecionado ao lado do campo.
 - Premissa: tamanho pedido `1024x1024` (`OPENAI_IMAGE_SIZE`), modelo `OPENAI_IMAGE_MODEL` (padrão `gpt-image-2`).
 - Premissa: sem chave, os 7 PNGs não são fabricados; o teste de completude roda com `REQUIRE_ALL_AVATARS=1` (obrigatório antes de integrar a arte aprovada).
-- ADR: `.adrs/XXXX-0021-avatares-pixel-art-gerados-uma-vez.md`, número provisório (renumerado pelo orquestrador).
+- ADR: `.adrs/0022-avatares-pixel-art-gerados-uma-vez.md`.
 
 ## Abordagem (fatias verticais)
 
