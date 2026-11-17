@@ -4,6 +4,9 @@ import { Select } from "@repo/ui/select";
 import { Spinner } from "@repo/ui/spinner";
 import { Textarea } from "@repo/ui/textarea";
 import { type FormEvent, type KeyboardEvent, useId, useLayoutEffect, useRef } from "react";
+import { AddConnectionButton } from "../connections/add-connection-button";
+import { AttachmentChips } from "../connections/attachment-chips";
+import { useAttachments } from "../connections/use-attachments";
 import { MESSAGE_LIMIT } from "./chat-state";
 import type { Expert } from "./use-experts";
 
@@ -41,9 +44,11 @@ export function Composer({
   const noticeId = `${ids}-notice`;
   const limitId = `${ids}-limit`;
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const attachments = useAttachments();
   const message = draft.trim();
   const tooLong = message.length > MESSAGE_LIMIT;
-  const canSend = message !== "" && !tooLong && !isAnswering;
+  // Files still uploading or processing hold the message back until they are ready or removed.
+  const canSend = message !== "" && !tooLong && !isAnswering && !attachments.isBusy;
   const describedBy =
     [tooLong ? limitId : null, expert.notice === null ? null : noticeId]
       .filter(Boolean)
@@ -65,6 +70,7 @@ export function Composer({
     if (canSend) {
       onSend(message);
       onDraftChange("");
+      attachments.clearSettled();
     }
   }
 
@@ -83,6 +89,7 @@ export function Composer({
 
   return (
     <div className="sticky bottom-0 z-10 border-t-2 border-border bg-card pb-[env(safe-area-inset-bottom)]">
+      <AddConnectionButton className="absolute -top-14 right-4" />
       <form
         aria-label="Send a message"
         onSubmit={handleSubmit}
@@ -104,6 +111,7 @@ export function Composer({
             ))}
           </Select>
         </div>
+        <AttachmentChips />
         <div className="flex items-end gap-3">
           <div className="min-w-0 flex-1 space-y-1">
             <Label htmlFor={textareaId} className="sr-only">

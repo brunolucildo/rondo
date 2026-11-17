@@ -58,7 +58,7 @@ export function ExpertChat({
 
   return (
     <>
-      <main className="mx-auto w-full max-w-3xl flex-1 space-y-6 px-4 py-6">
+      <main className="mx-auto w-full max-w-3xl flex-1 space-y-6 px-4 pt-6 pb-20">
         {chat.messages.length === 0 ? (
           <ExpertIntro expert={expert} onAsk={ask} disabled={chat.isAnswering} />
         ) : null}

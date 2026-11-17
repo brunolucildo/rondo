@@ -57,6 +57,8 @@ Requisitos mínimos para qualquer conector:
 4. Citação da fonte na entrega do expert.
 5. Revogação de acesso e remoção dos dados indexados.
 
+**Primeiro conector entregue (spec `0023`): arquivos de texto enviados pela pessoa** (`.pdf`, `.txt` e `.md`, até 20 MB, até 50 conexões por usuário). Atende aos requisitos 2 e 3 acima: a ingestão é idempotente (o mesmo conteúdo, medido pelo SHA-256 dos bytes, não é indexado de novo, e o nome do arquivo não faz parte da identidade) e a origem (nome, tipo, página e posição do trecho) fica nos metadados. Decisões de produto: a base é **por usuário** (sem deduplicação nem compartilhamento entre usuários); o **arquivo original não é guardado**, só o texto extraído em trechos e os metadados; o conteúdo vai a um provedor de IA para gerar embeddings, por isso um aviso de privacidade aparece antes do primeiro envio (o aceite é lembrado no navegador, sem registro no servidor: se a LGPD exigir registro para dados de saúde, é uma decisão em aberto do Jurídico); PDF escaneado (sem texto) falha com mensagem clara, sem OCR. A citação (requisito 4) é da spec `0024` e a exclusão (requisito 5) é da `0025`.
+
 ## 6. Fluxo de valor (alvo)
 
 ```text

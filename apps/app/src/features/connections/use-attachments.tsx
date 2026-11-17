@@ -1,0 +1,274 @@
+import { useMutation, useQueries, useQueryClient } from "@tanstack/react-query";
+import {
+  createContext,
+  type ReactNode,
+  useCallback,
+  useContext,
+  useReducer,
+  useRef,
+  useState,
+} from "react";
+import { apiClient } from "../../lib/api-client";
+import { uploadClient } from "../../lib/upload-client";
+import {
+  checkFileBeforeUpload,
+  type ConnectionDto,
+  describeProcessingFailure,
+  describeUploadFailure,
+  type FailureMessage,
+} from "./connection-messages";
+import { PrivacyNotice } from "./privacy-notice";
+
+const PRIVACY_KEY = "rondo.connections.privacy-accepted";
+const POLL_START_MS = 1000;
+const POLL_STEP_MS = 500;
+const POLL_MAX_MS = 5000;
+
+export type AttachmentPhase = "uploading" | "processing" | "ready" | "failed";
+
+export interface AttachmentView {
+  id: string;
+  name: string;
+  phase: AttachmentPhase;
+  /** The explanation of a failure, or `null`. */
+  message: string | null;
+  /** True when sending the same file again can work. */
+  canRetry: boolean;
+}
+
+interface Attachment {
+  id: string;
+  file: File;
+  /** Set once the API answered; the status is then followed by polling. */
+  connectionId: string | null;
+  /** Why the upload itself was refused or failed. */
+  rejection: FailureMessage | null;
+}
+
+type Action =
+  | { type: "added"; attachment: Attachment }
+  | { type: "sent"; id: string; connectionId: string }
+  | { type: "rejected"; id: string; rejection: FailureMessage }
+  | { type: "restarted"; id: string }
+  | { type: "removed"; id: string }
+  | { type: "cleared"; ids: readonly string[] };
+
+function reducer(state: readonly Attachment[], action: Action): Attachment[] {
+  switch (action.type) {
+    case "added":
+      return [...state, action.attachment];
+    case "sent":
+      return state.map((item) =>
+        item.id === action.id
+          ? { ...item, connectionId: action.connectionId, rejection: null }
+          : item,
+      );
+    case "rejected":
+      return state.map((item) =>
+        item.id === action.id ? { ...item, rejection: action.rejection } : item,
+      );
+    case "restarted":
+      return state.map((item) =>
+        item.id === action.id ? { ...item, connectionId: null, rejection: null } : item,
+      );
+    case "removed":
+      return state.filter((item) => item.id !== action.id);
+    case "cleared":
+      return state.filter((item) => !action.ids.includes(item.id));
+  }
+}
+
+function readPrivacyAccepted(): boolean {
+  try {
+    return window.localStorage.getItem(PRIVACY_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
+function rememberPrivacyAccepted(): void {
+  try {
+    window.localStorage.setItem(PRIVACY_KEY, "true");
+  } catch {
+    // The notice then shows again next time; nothing else depends on it.
+  }
+}
+
+/** The status query of one connection: polls from 1 s up to 5 s while it is not settled. */
+function connectionQuery(connectionId: string) {
+  return {
+    queryKey: ["connections", connectionId] as const,
+    queryFn: () => apiClient.get<ConnectionDto>(`/connections/${connectionId}`),
+    // The upload answer seeds the cache; only the interval below refreshes it.
+    staleTime: Infinity,
+    refetchInterval: (query: {
+      state: { data: ConnectionDto | undefined; dataUpdateCount: number };
+    }) => {
+      const status = query.state.data?.status;
+
+      return status === "ready" || status === "failed"
+        ? false
+        : Math.min(POLL_START_MS + POLL_STEP_MS * query.state.dataUpdateCount, POLL_MAX_MS);
+    },
+  };
+}
+
+interface AttachmentsContextValue {
+  attachments: readonly AttachmentView[];
+  /** True while a file is uploading or processing: `Send` must wait. */
+  isBusy: boolean;
+  addFile: (file: File) => void;
+  removeAttachment: (id: string) => void;
+  retryAttachment: (id: string) => void;
+  /** Drops the chips that are not in progress (the message was sent). */
+  clearSettled: () => void;
+}
+
+const AttachmentsContext = createContext<AttachmentsContextValue | null>(null);
+
+function viewOf(item: Attachment, connection: ConnectionDto | undefined): AttachmentView {
+  const base = { id: item.id, name: item.file.name };
+
+  if (item.rejection !== null) {
+    return {
+      ...base,
+      phase: "failed",
+      message: item.rejection.text,
+      canRetry: item.rejection.retryable,
+    };
+  }
+
+  if (item.connectionId === null) {
+    return { ...base, phase: "uploading", message: null, canRetry: false };
+  }
+
+  if (connection?.status === "ready") {
+    return { ...base, phase: "ready", message: null, canRetry: false };
+  }
+
+  if (connection?.status === "failed") {
+    const failure = describeProcessingFailure(connection.errorCode);
+
+    return { ...base, phase: "failed", message: failure.text, canRetry: failure.retryable };
+  }
+
+  return { ...base, phase: "processing", message: null, canRetry: false };
+}
+
+/**
+ * The files attached to the next message, with the status of each one. It lives above the chat so
+ * the chips survive a change of expert. Choosing a file asks for the privacy notice first (once
+ * per browser); then the file is uploaded and its status is followed until `ready` or `failed`.
+ * The polling belongs to this provider's queries, so it stops when the page is left. Removing a
+ * chip never deletes the connection (that is a later feature).
+ */
+export function AttachmentsProvider({ children }: { children: ReactNode }) {
+  const queryClient = useQueryClient();
+  const [items, dispatch] = useReducer(reducer, []);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const counter = useRef(0);
+  const { mutateAsync } = useMutation({
+    mutationFn: (file: File) => uploadClient.postFile<ConnectionDto>("/connections", file),
+  });
+
+  // One query per connection: the same file attached twice is one connection (deduplication).
+  const connectionIds = [
+    ...new Set(items.flatMap((item) => (item.connectionId === null ? [] : [item.connectionId]))),
+  ];
+  const results = useQueries({ queries: connectionIds.map(connectionQuery) });
+  const connectionOf = new Map<string, ConnectionDto | undefined>(
+    connectionIds.map((connectionId, position) => [connectionId, results[position]?.data]),
+  );
+  const views = items.map((item) =>
+    viewOf(item, item.connectionId === null ? undefined : connectionOf.get(item.connectionId)),
+  );
+
+  const send = useCallback(
+    async (id: string, file: File) => {
+      try {
+        const connection = await mutateAsync(file);
+
+        queryClient.setQueryData(["connections", connection.id], connection);
+        dispatch({ type: "sent", id, connectionId: connection.id });
+      } catch (error) {
+        dispatch({ type: "rejected", id, rejection: describeUploadFailure(error) });
+      }
+    },
+    [mutateAsync, queryClient],
+  );
+
+  const start = useCallback(
+    (file: File) => {
+      counter.current += 1;
+
+      const id = `attachment-${counter.current}`;
+      const refusal = checkFileBeforeUpload(file);
+
+      dispatch({ type: "added", attachment: { id, file, connectionId: null, rejection: refusal } });
+
+      if (refusal === null) {
+        void send(id, file);
+      }
+    },
+    [send],
+  );
+
+  const addFile = useCallback(
+    (file: File) => {
+      if (readPrivacyAccepted()) {
+        start(file);
+      } else {
+        setPendingFile(file);
+      }
+    },
+    [start],
+  );
+
+  const value: AttachmentsContextValue = {
+    attachments: views,
+    isBusy: views.some((view) => view.phase === "uploading" || view.phase === "processing"),
+    addFile,
+    removeAttachment: (id) => dispatch({ type: "removed", id }),
+    retryAttachment: (id) => {
+      const item = items.find((candidate) => candidate.id === id);
+
+      if (item !== undefined) {
+        dispatch({ type: "restarted", id });
+        void send(id, item.file);
+      }
+    },
+    clearSettled: () =>
+      dispatch({
+        type: "cleared",
+        ids: views
+          .filter((view) => view.phase === "ready" || view.phase === "failed")
+          .map((view) => view.id),
+      }),
+  };
+
+  return (
+    <AttachmentsContext.Provider value={value}>
+      {children}
+      {pendingFile === null ? null : (
+        <PrivacyNotice
+          onAccept={() => {
+            rememberPrivacyAccepted();
+            start(pendingFile);
+            setPendingFile(null);
+          }}
+          onCancel={() => setPendingFile(null)}
+        />
+      )}
+    </AttachmentsContext.Provider>
+  );
+}
+
+export function useAttachments(): AttachmentsContextValue {
+  const value = useContext(AttachmentsContext);
+
+  if (value === null) {
+    throw new Error("useAttachments must be used inside AttachmentsProvider.");
+  }
+
+  return value;
+}
