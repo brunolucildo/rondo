@@ -21,7 +21,21 @@ export interface Citation {
   /** One-based, or `null` for a source without pages. */
   page: number | null;
   position: number;
+  /** Only the conversation read from the server says it (`false` while the source exists). */
+  removed?: false;
 }
+
+/**
+ * A source that was deleted after the answer (spec 0025): the server sends no name for it, and the
+ * interface shows "Source removed".
+ */
+export interface RemovedCitation {
+  connectionId: string;
+  removed: true;
+}
+
+/** What an answer lists as a source: a live one, or one whose connection no longer exists. */
+export type AnswerCitation = Citation | RemovedCitation;
 
 export interface UserMessage {
   id: string;
@@ -38,7 +52,7 @@ export interface ExpertMessage {
    * The sources of the answer. `null`: no search ran (the user had no connected file). `[]`: it ran
    * and no connected source covers the question.
    */
-  citations: Citation[] | null;
+  citations: AnswerCitation[] | null;
 }
 
 export type ChatMessage = UserMessage | ExpertMessage;
@@ -50,7 +64,7 @@ export interface StoredMessage {
   content: string;
   status: "complete" | "incomplete";
   /** Absent in answers stored before the sources existed. */
-  citations?: Citation[] | null;
+  citations?: AnswerCitation[] | null;
   createdAt: string;
 }
 

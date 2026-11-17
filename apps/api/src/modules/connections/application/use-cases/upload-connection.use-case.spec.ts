@@ -19,6 +19,7 @@ function setup(now: () => Date = () => new Date()) {
   const telemetry: ConnectionTelemetry = {
     traceIngestion: vi.fn(),
     recordDeduplicated: vi.fn(),
+    recordDeletion: vi.fn(),
   };
   const upload = new UploadConnection(
     repository,

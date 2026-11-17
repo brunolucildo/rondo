@@ -19,6 +19,25 @@ export interface StoredMessage {
   createdAt: Date;
 }
 
+/**
+ * A citation as the conversation shows it: the stored one while its connection exists, or just the
+ * `connectionId` flagged `removed` once the connection was deleted (the name stays in storage but
+ * never leaves the server).
+ */
+export type ResolvedCitation =
+  | (Citation & { removed: false })
+  | { connectionId: string; removed: true };
+
+export interface ResolvedMessage extends Omit<StoredMessage, "citations"> {
+  citations: ResolvedCitation[] | null;
+}
+
+export interface ResolvedMessagePage {
+  /** Chronological order (oldest first). */
+  messages: ResolvedMessage[];
+  nextCursor: string | null;
+}
+
 export interface NewMessage {
   role: StoredMessageRole;
   content: string;

@@ -6,6 +6,10 @@ import type {
   NewConnection,
 } from "../domain/connection-ports";
 
+/** Being processed right now: `processing` and not older than the stale cutoff. */
+const isActiveProcessing = (row: Connection, staleBefore: Date): boolean =>
+  row.status === "processing" && row.updatedAt >= staleBefore;
+
 /**
  * `ConnectionRepository` in memory, with the same semantics as the Postgres one (unique
  * `(user, hash)`, atomic claim, scoped by user). `now` is injectable so tests control the clock.
@@ -118,5 +122,51 @@ export class InMemoryConnectionRepository implements ConnectionRepository {
     }
 
     return Promise.resolve();
+  }
+
+  listByUser(userId: string): Promise<Connection[]> {
+    return Promise.resolve(
+      [...this.rows.values()]
+        .filter((row) => row.userId === userId)
+        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+        .map((row) => ({ ...row })),
+    );
+  }
+
+  hasActiveProcessing(userId: string, staleBefore: Date): Promise<boolean> {
+    return Promise.resolve(
+      [...this.rows.values()].some(
+        (row) => row.userId === userId && isActiveProcessing(row, staleBefore),
+      ),
+    );
+  }
+
+  deleteSettled(userId: string, connectionId: string, staleBefore: Date): Promise<boolean> {
+    const row = this.rows.get(connectionId);
+
+    if (row?.userId !== userId || isActiveProcessing(row, staleBefore)) {
+      return Promise.resolve(false);
+    }
+
+    return Promise.resolve(this.rows.delete(connectionId));
+  }
+
+  deleteAllSettled(userId: string, staleBefore: Date): Promise<number> {
+    let deleted = 0;
+
+    for (const [id, row] of this.rows) {
+      if (row.userId === userId && !isActiveProcessing(row, staleBefore)) {
+        this.rows.delete(id);
+        deleted += 1;
+      }
+    }
+
+    return Promise.resolve(deleted);
+  }
+
+  findExistingIds(userId: string, connectionIds: readonly string[]): Promise<string[]> {
+    return Promise.resolve(
+      [...new Set(connectionIds)].filter((id) => this.rows.get(id)?.userId === userId),
+    );
   }
 }

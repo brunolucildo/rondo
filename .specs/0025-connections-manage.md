@@ -3,7 +3,7 @@
 > Spec executável. Preencha todas as seções; `TODO` é lacuna, não requisito.
 > Use `create-spec` para criar, `refine-spec` para auditar e `implement-me` para executar.
 
-- **Status:** pronta
+- **Status:** concluída
 - **Slug:** 0025-connections-manage
 - **Data:** 2026-11-17
 - **Atualizado em:** 2026-11-17
@@ -75,17 +75,17 @@
 
 ## 6. Acceptance Criteria
 
-- [ ] Given dois usuários, Then `GET /connections` devolve só as do usuário da sessão, da mais recente para a mais antiga.
-- [ ] Given uma conexão `ready`, When `DELETE`, Then `204`, o índice não devolve mais chunks e a linha não existe.
-- [ ] Given `id` de outro usuário, Then `404` sem alterar nada; given `id` inválido, `400`.
-- [ ] Given o Weaviate parado, Then `503` e a linha permanece; given a repetição com o Weaviate de volta, `204`.
-- [ ] Given `processing`, Then `409 CONNECTION_PROCESSING`; given `failed`, `204`.
-- [ ] Given um arquivo excluído, When reenviado, Then é uma conexão nova, com embeddings e índice chamados.
-- [ ] Given `DELETE /connections`, Then `204`, lista vazia, tenant removido; repetir é `204`; com uma `processing`, `409` e nada é apagado.
-- [ ] Given uma citação de conexão excluída, Then a conversa mostra "Source removed", sem nome, e a resposta permanece.
-- [ ] Given o painel, Then lista, estado vazio, carregando, erro, exclusão e "Delete all" funcionam com confirmação e por teclado, em 375 px.
-- [ ] Given o sentinela no nome do arquivo, Then não aparece em log, span ou métrica.
-- [ ] Given `bun run lint`, `check-types`, `test`, `test:integration` e `test:e2e`, Then passam sem chamar a OpenAI.
+- [x] Given dois usuários, Then `GET /connections` devolve só as do usuário da sessão, da mais recente para a mais antiga.
+- [x] Given uma conexão `ready`, When `DELETE`, Then `204`, o índice não devolve mais chunks e a linha não existe.
+- [x] Given `id` de outro usuário, Then `404` sem alterar nada; given `id` inválido, `400`.
+- [x] Given o Weaviate parado, Then `503` e a linha permanece; given a repetição com o Weaviate de volta, `204`.
+- [x] Given `processing`, Then `409 CONNECTION_PROCESSING`; given `failed`, `204`.
+- [x] Given um arquivo excluído, When reenviado, Then é uma conexão nova, com embeddings e índice chamados.
+- [x] Given `DELETE /connections`, Then `204`, lista vazia, tenant removido; repetir é `204`; com uma `processing`, `409` e nada é apagado.
+- [x] Given uma citação de conexão excluída, Then a conversa mostra "Source removed", sem nome, e a resposta permanece.
+- [x] Given o painel, Then lista, estado vazio, carregando, erro, exclusão e "Delete all" funcionam com confirmação e por teclado, em 375 px.
+- [x] Given o sentinela no nome do arquivo, Then não aparece em log, span ou métrica.
+- [x] Given `bun run lint`, `check-types`, `test`, `test:integration` e `test:e2e`, Then passam sem chamar a OpenAI.
 
 ## 7. O que fazer
 
@@ -144,3 +144,11 @@ Como validar que a spec foi atendida:
 | ---------- | ---------------------- | ----------------------------------------------- |
 | 2026-11-17 | Spec criada (rascunho) | Quebra do épico de experts (`breakdown-specs`). |
 | 2026-11-17 | Passo 8 inclui o ADR da exclusão | Auditoria: `RULES.md` §5 pede ADR para decisão de dados e retenção; nenhum requisito alterado |
+| 2026-11-17 | Implementada (status concluída; critérios marcados) | Execução do `implement-me` (orquestrada): API de listagem e exclusão, citações removidas, painel, testes, docs e ADR provisório `0026-0025-exclusao-de-conexoes` |
+
+### Premissas registradas na implementação
+
+- A exclusão de conexão `processing` há menos de 15 minutos é recusada com `409`; o `delete` da linha repete a condição para que um reenvio que reivindicou o `failed` no meio não perca a linha (também `409`).
+- A leitura da conversa devolve cada citação com `removed`; a de fonte excluída vai como `{ connectionId, removed: true }`, sem nome. A interface junta várias citações da mesma conexão excluída em uma linha "Source removed".
+- O painel é aberto por um botão "Your connections" ao lado de "Add connection" (as seções "Add" e "Your connections" ficam no mesmo painel); depois de excluir, as fontes em tela viram "Source removed" na hora, sem recarregar.
+- Sem rate limit novo nas rotas de exclusão e listagem (por usuário autenticado, idempotentes).

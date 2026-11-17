@@ -44,6 +44,10 @@ function createInstruments() {
       unit: "s",
       advice: { explicitBucketBoundaries: DURATION_BUCKETS_SECONDS },
     }),
+    deletions: meter.createCounter("connection.deletions", {
+      description: "Connection deletion requests (spec 0025), by scope and outcome.",
+      unit: "{deletion}",
+    }),
   };
 }
 
@@ -54,6 +58,43 @@ function getInstruments() {
   instruments ??= createInstruments();
 
   return instruments;
+}
+
+export type ConnectionDeletionScope = "single" | "all";
+export type ConnectionDeletionOutcome =
+  | "success"
+  | "not_found"
+  | "processing"
+  | "index_unavailable"
+  | "error";
+
+/**
+ * Counter and `connection_deleted` log of one deletion request (spec 0025): scope, outcome and
+ * duration only. Never the file name, a `connectionId` or a `userId`. Never throws.
+ */
+export function recordConnectionDeletion(
+  scope: ConnectionDeletionScope,
+  outcome: ConnectionDeletionOutcome,
+  durationSeconds: number,
+): void {
+  try {
+    getInstruments().deletions.add(1, { scope, outcome });
+
+    const fields = {
+      event: "connection_deleted",
+      scope,
+      outcome,
+      durationMs: Math.round(durationSeconds * 1000),
+    };
+
+    if (outcome === "success" || outcome === "not_found" || outcome === "processing") {
+      baseLogger.info(fields, "connection_deleted");
+    } else {
+      baseLogger.warn(fields, "connection_deleted");
+    }
+  } catch {
+    // Telemetry must never change the answer.
+  }
 }
 
 /** Counter, histogram and `connection_ingested` log of one finished ingestion. Never throws. */

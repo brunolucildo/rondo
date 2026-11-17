@@ -40,6 +40,8 @@ class RecordingTelemetry implements ConnectionTelemetry {
   }
 
   recordDeduplicated(): void {}
+
+  recordDeletion(): void {}
 }
 
 function setup(

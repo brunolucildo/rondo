@@ -12,7 +12,10 @@ import {
   KnowledgeModule,
 } from "../knowledge";
 import { ConnectionProcessor } from "./application/services/connection-processor";
+import { DeleteAllConnections } from "./application/use-cases/delete-all-connections.use-case";
+import { DeleteConnection } from "./application/use-cases/delete-connection.use-case";
 import { GetConnection } from "./application/use-cases/get-connection.use-case";
+import { ListConnections } from "./application/use-cases/list-connections.use-case";
 import { UploadConnection } from "./application/use-cases/upload-connection.use-case";
 import type { ConnectionRepository, ConnectionTelemetry } from "./domain/connection-ports";
 import {
@@ -25,17 +28,27 @@ import { NodeContentHasher } from "./infrastructure/node-content-hasher";
 import { OtelConnectionTelemetry } from "./infrastructure/otel-connection-telemetry";
 import { PostgresConnectionRepository } from "./infrastructure/postgres-connection.repository";
 import { RecursiveTextChunker } from "./infrastructure/recursive-text-chunker";
+import { DeleteAllConnectionsRequestHandler } from "./interface/request-handlers/delete-all-connections.request-handler";
+import { DeleteConnectionRequestHandler } from "./interface/request-handlers/delete-connection.request-handler";
 import { GetConnectionRequestHandler } from "./interface/request-handlers/get-connection.request-handler";
+import { ListConnectionsRequestHandler } from "./interface/request-handlers/list-connections.request-handler";
 import { UploadConnectionRequestHandler } from "./interface/request-handlers/upload-connection.request-handler";
 
 /**
  * Connections of the user (spec 0023): upload of PDF, TXT and Markdown files, deduplication by
- * content, background processing into the knowledge index, and the status endpoint. It uses the
+ * content, background processing into the knowledge index, and the status endpoint. Spec 0025
+ * adds the listing and the deletion (one or all: vectors first, then the record). It uses the
  * `knowledge` ports (`KnowledgeIndex`, `EmbeddingsGenerator`) and its own Postgres pool.
  */
 @Module({
   imports: [KnowledgeModule],
-  controllers: [UploadConnectionRequestHandler, GetConnectionRequestHandler],
+  controllers: [
+    UploadConnectionRequestHandler,
+    ListConnectionsRequestHandler,
+    GetConnectionRequestHandler,
+    DeleteConnectionRequestHandler,
+    DeleteAllConnectionsRequestHandler,
+  ],
   providers: [
     {
       // Server only: DML as `rondo_app`. Closed on shutdown, after the processing in flight ends.
@@ -87,6 +100,29 @@ import { UploadConnectionRequestHandler } from "./interface/request-handlers/upl
       provide: GetConnection,
       inject: [CONNECTION_REPOSITORY],
       useFactory: (repository: ConnectionRepository) => new GetConnection(repository),
+    },
+    {
+      provide: ListConnections,
+      inject: [CONNECTION_REPOSITORY],
+      useFactory: (repository: ConnectionRepository) => new ListConnections(repository),
+    },
+    {
+      provide: DeleteConnection,
+      inject: [CONNECTION_REPOSITORY, KNOWLEDGE_INDEX, CONNECTION_TELEMETRY],
+      useFactory: (
+        repository: ConnectionRepository,
+        index: KnowledgeIndex,
+        telemetry: ConnectionTelemetry,
+      ) => new DeleteConnection(repository, index, telemetry),
+    },
+    {
+      provide: DeleteAllConnections,
+      inject: [CONNECTION_REPOSITORY, KNOWLEDGE_INDEX, CONNECTION_TELEMETRY],
+      useFactory: (
+        repository: ConnectionRepository,
+        index: KnowledgeIndex,
+        telemetry: ConnectionTelemetry,
+      ) => new DeleteAllConnections(repository, index, telemetry),
     },
   ],
   // The experts read the status of the user's connections (spec 0024) through this port.

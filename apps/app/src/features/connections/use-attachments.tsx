@@ -54,6 +54,8 @@ type Action =
   | { type: "restarted"; id: string }
   | { type: "flagged"; ids: readonly string[]; problem: string }
   | { type: "removed"; id: string }
+  /** The connections were deleted on the server: the chips that point at them go. */
+  | { type: "dropped"; connectionIds: readonly string[] }
   | { type: "cleared"; ids: readonly string[] };
 
 function reducer(state: readonly Attachment[], action: Action): Attachment[] {
@@ -82,6 +84,10 @@ function reducer(state: readonly Attachment[], action: Action): Attachment[] {
       );
     case "removed":
       return state.filter((item) => item.id !== action.id);
+    case "dropped":
+      return state.filter(
+        (item) => item.connectionId === null || !action.connectionIds.includes(item.connectionId),
+      );
     case "cleared":
       return state.filter((item) => !action.ids.includes(item.id));
   }
@@ -143,9 +149,17 @@ interface AttachmentsContextValue {
   readyConnectionIds: readonly string[];
   /** Marks the ready files as the cause of a refused send; the chip says what to do. */
   flagProblem: (problem: "not-found" | "not-ready") => void;
+  /**
+   * The connections the person deleted in this page (spec 0025). Their chips go and the sources
+   * of the answers on screen that cite them read "Source removed" at once.
+   */
+  removedConnectionIds: ReadonlySet<string>;
+  connectionsDeleted: (connectionIds: readonly string[]) => void;
 }
 
 const AttachmentsContext = createContext<AttachmentsContextValue | null>(null);
+
+const NO_REMOVED_CONNECTIONS: ReadonlySet<string> = new Set();
 
 function viewOf(item: Attachment, connection: ConnectionDto | undefined): AttachmentView {
   const base = { id: item.id, name: item.file.name };
@@ -185,12 +199,13 @@ function viewOf(item: Attachment, connection: ConnectionDto | undefined): Attach
  * the chips survive a change of expert. Choosing a file asks for the privacy notice first (once
  * per browser); then the file is uploaded and its status is followed until `ready` or `failed`.
  * The polling belongs to this provider's queries, so it stops when the page is left. Removing a
- * chip never deletes the connection (that is a later feature).
+ * chip never deletes the connection (that is done in the panel of connections).
  */
 export function AttachmentsProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const [items, dispatch] = useReducer(reducer, []);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [removedConnectionIds, setRemovedConnectionIds] = useState<ReadonlySet<string>>(new Set());
   const counter = useRef(0);
   const { mutateAsync } = useMutation({
     mutationFn: (file: File) => uploadClient.postFile<ConnectionDto>("/connections", file),
@@ -252,8 +267,22 @@ export function AttachmentsProvider({ children }: { children: ReactNode }) {
     [start],
   );
 
+  const connectionsDeleted = useCallback(
+    (deletedIds: readonly string[]) => {
+      setRemovedConnectionIds((current) => new Set([...current, ...deletedIds]));
+      dispatch({ type: "dropped", connectionIds: deletedIds });
+
+      for (const connectionId of deletedIds) {
+        queryClient.removeQueries({ queryKey: ["connections", connectionId], exact: true });
+      }
+    },
+    [queryClient],
+  );
+
   const value: AttachmentsContextValue = {
     attachments: views,
+    removedConnectionIds,
+    connectionsDeleted,
     // A file the server refused to use also holds the message back: sending without it would
     // silently widen the search to the whole base.
     isBusy:
@@ -308,6 +337,14 @@ export function AttachmentsProvider({ children }: { children: ReactNode }) {
       )}
     </AttachmentsContext.Provider>
   );
+}
+
+/**
+ * The connections deleted in this page, for the places that only read them (the sources of an
+ * answer). Unlike `useAttachments` it does not require the provider: without it nothing was deleted.
+ */
+export function useRemovedConnectionIds(): ReadonlySet<string> {
+  return useContext(AttachmentsContext)?.removedConnectionIds ?? NO_REMOVED_CONNECTIONS;
 }
 
 export function useAttachments(): AttachmentsContextValue {

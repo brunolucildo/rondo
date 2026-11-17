@@ -14,6 +14,7 @@ import type {
   InsertedConnection,
   NewConnection,
 } from "../domain/connection-ports";
+import { isUuidLike } from "../domain/connection-rules";
 import { DataAccessError } from "./data-access-error";
 
 const COLUMNS =
@@ -232,5 +233,81 @@ export class PostgresConnectionRepository implements ConnectionRepository {
         where id = $1 and user_id = $2`,
       [connectionId, userId, errorCode],
     );
+  }
+
+  async listByUser(userId: string): Promise<Connection[]> {
+    const rows = await this.run(
+      "connections_list",
+      { operation: "select", collection: "connections" },
+      `select ${COLUMNS} from public.connections where user_id = $1 order by created_at desc, id desc`,
+      [userId],
+    );
+
+    return rows.map((row) => toConnection("connections_list", row));
+  }
+
+  async hasActiveProcessing(userId: string, staleBefore: Date): Promise<boolean> {
+    const [row] = await this.run(
+      "connections_has_active_processing",
+      { operation: "select", collection: "connections" },
+      `select exists (
+         select 1 from public.connections
+          where user_id = $1 and status = 'processing' and updated_at >= $2
+       ) as found`,
+      [userId, staleBefore.toISOString()],
+    );
+    const found: unknown = row?.found;
+
+    if (typeof found !== "boolean") {
+      throw new DataAccessError("connections_has_active_processing", "UNEXPECTED_RESULT");
+    }
+
+    return found;
+  }
+
+  async deleteSettled(userId: string, connectionId: string, staleBefore: Date): Promise<boolean> {
+    const rows = await this.run(
+      "connections_delete",
+      { operation: "delete", collection: "connections" },
+      `delete from public.connections
+        where id = $1 and user_id = $2
+          and not (status = 'processing' and updated_at >= $3)
+        returning id`,
+      [connectionId, userId, staleBefore.toISOString()],
+    );
+
+    return rows.length > 0;
+  }
+
+  async deleteAllSettled(userId: string, staleBefore: Date): Promise<number> {
+    const rows = await this.run(
+      "connections_delete_all",
+      { operation: "delete", collection: "connections" },
+      `delete from public.connections
+        where user_id = $1
+          and not (status = 'processing' and updated_at >= $2)
+        returning id`,
+      [userId, staleBefore.toISOString()],
+    );
+
+    return rows.length;
+  }
+
+  async findExistingIds(userId: string, connectionIds: readonly string[]): Promise<string[]> {
+    // Ids that are not UUIDs cannot be connections (and would break the cast): leave them out.
+    const candidates = [...new Set(connectionIds.filter(isUuidLike))];
+
+    if (candidates.length === 0) {
+      return [];
+    }
+
+    const rows = await this.run(
+      "connections_find_existing",
+      { operation: "select", collection: "connections" },
+      "select id from public.connections where user_id = $1 and id = any($2::uuid[])",
+      [userId, candidates],
+    );
+
+    return rows.flatMap((row) => (typeof row.id === "string" ? [row.id] : []));
   }
 }
