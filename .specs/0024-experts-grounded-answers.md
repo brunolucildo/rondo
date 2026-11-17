@@ -3,7 +3,7 @@
 > Spec executável. Preencha todas as seções; `TODO` é lacuna, não requisito.
 > Use `create-spec` para criar, `refine-spec` para auditar e `implement-me` para executar.
 
-- **Status:** pronta
+- **Status:** concluída (execução orquestrada; pendências: avaliação com o modelo real e calibração do limiar, ver `QA.md` §1.21)
 - **Slug:** 0024-experts-grounded-answers
 - **Data:** 2026-11-17
 - **Atualizado em:** 2026-11-17
@@ -77,18 +77,18 @@
 
 ## 6. Acceptance Criteria
 
-- [ ] Given um PDF indexado e uma pergunta sobre ele, Then o modelo recebe o trecho no contexto e a resposta traz as citações do servidor.
-- [ ] Given um usuário sem conexões, Then não há chamada de embeddings nem do índice.
-- [ ] Given `connectionIds` de outro usuário ou inexistentes, Then `404 CONNECTION_NOT_FOUND`; given `processing`, `409 CONNECTION_NOT_READY`.
-- [ ] Given `connectionIds` de um arquivo, Then só trechos dele chegam ao modelo; sem ids, chegam trechos de toda a base.
-- [ ] Given o mesmo arquivo reaproveitado por dedup, Then a resposta usa os trechos já indexados sem novo embedding do arquivo.
-- [ ] Given dois trechos da mesma página, Then uma citação; given o modelo que cita um arquivo inexistente, Then a lista de citações não o contém.
-- [ ] Given recarregar a conversa, Then as citações voltam e não há texto de trecho persistido.
-- [ ] Given pergunta sem relação com as fontes, Then a resposta traz a declaração de lacuna, `citations: []` e o aviso na interface.
-- [ ] Given um trecho com instrução maliciosa, Then ele vai no bloco delimitado e a persona e os limites continuam valendo.
-- [ ] Given o Weaviate parado, Then com conexões `KNOWLEDGE_UNAVAILABLE` com `Try again`, e sem conexões a resposta chega normalmente.
-- [ ] Given o sentinela, Then nenhum log, span ou métrica contém trecho, pergunta, resposta ou nome da fonte.
-- [ ] Given `bun run lint`, `check-types`, `test`, `test:integration` e `test:e2e`, Then passam sem chamar a OpenAI.
+- [x] Given um PDF indexado e uma pergunta sobre ele, Then o modelo recebe o trecho no contexto e a resposta traz as citações do servidor.
+- [x] Given um usuário sem conexões, Then não há chamada de embeddings nem do índice.
+- [x] Given `connectionIds` de outro usuário ou inexistentes, Then `404 CONNECTION_NOT_FOUND`; given `processing`, `409 CONNECTION_NOT_READY`.
+- [x] Given `connectionIds` de um arquivo, Then só trechos dele chegam ao modelo; sem ids, chegam trechos de toda a base.
+- [x] Given o mesmo arquivo reaproveitado por dedup, Then a resposta usa os trechos já indexados sem novo embedding do arquivo.
+- [x] Given dois trechos da mesma página, Then uma citação; given o modelo que cita um arquivo inexistente, Then a lista de citações não o contém.
+- [x] Given recarregar a conversa, Then as citações voltam e não há texto de trecho persistido.
+- [x] Given pergunta sem relação com as fontes, Then a resposta traz a declaração de lacuna, `citations: []` e o aviso na interface.
+- [x] Given um trecho com instrução maliciosa, Then ele vai no bloco delimitado e a persona e os limites continuam valendo.
+- [x] Given o Weaviate parado, Then com conexões `KNOWLEDGE_UNAVAILABLE` com `Try again`, e sem conexões a resposta chega normalmente.
+- [x] Given o sentinela, Then nenhum log, span ou métrica contém trecho, pergunta, resposta ou nome da fonte.
+- [x] Given `bun run lint`, `check-types`, `test`, `test:integration` e `test:e2e`, Then passam sem chamar a OpenAI.
 
 ## 7. O que fazer
 
@@ -141,6 +141,8 @@ Como validar que a spec foi atendida:
 | **Premissa:** até 6 trechos por pergunta e limiar de similaridade configurável (valor inicial definido na calibração).                                                                  | Qualidade e custo de tokens.                                      | Não         | Eng./Produto   |
 | **Premissa:** a citação guarda `connectionId`, nome, página e posição; nunca o trecho.                                                                                                  | Privacidade; a interface não reexibe o trecho depois.             | Não         | Produto/Jurídico |
 | Pergunta: o Produto quer ver o trecho exato ao clicar numa fonte (recuperando do índice na hora, enquanto a fonte existir)?                                                             | Interface e leitura do índice no histórico.                       | Não         | Produto        |
+| **Premissa (execução, 2026-11-17):** `citations` nulo na mensagem significa que nenhuma recuperação rodou (pergunta, usuário sem conexões, mensagem antiga) e `[]` significa lacuna; a interface só mostra o aviso para `[]`. | Distinguir "sem busca" de "lacuna" sem coluna extra. | Não | Eng. |
+| **Premissa (execução, 2026-11-17):** R8 manda manter a pergunta gravada quando a busca falha; reenviar o mesmo texto (`Try again`) reaproveita essa pergunta em vez de repeti-la. O limiar inicial é 0,30 e o máximo de trechos configurável é 12 (`EXPERT_RETRIEVAL_MIN_SCORE`, `EXPERT_RETRIEVAL_MAX_CHUNKS`). | Histórico sem pergunta duplicada; calibração pendente com o modelo real. | Não | Eng./Produto |
 | **Premissa:** o E2E usa o modelo de chat e os embeddings falsos (`NODE_ENV=test`, como na 0019); a declaração de lacuna é escrita pelo modelo no idioma do usuário e o selo da interface ("No connected source covers this.") é texto de interface em en-US. | Testabilidade e coerência de idioma. | Não | Eng./Produto |
 
 ## 12. Refinamento
@@ -148,4 +150,5 @@ Como validar que a spec foi atendida:
 | Data       | O que mudou            | Motivo                                          |
 | ---------- | ---------------------- | ----------------------------------------------- |
 | 2026-11-17 | Spec criada (rascunho) | Quebra do épico de experts (`breakdown-specs`). |
+| 2026-11-17 | Spec executada (implement-me, modo orquestrado): status concluída, critérios marcados, premissas de execução registradas | Entrega da 0024; avaliação com o modelo real e calibração do limiar ficam pendentes (`QA.md` §1.21) |
 | 2026-11-17 | R4 (posição da citação deduplicada) e R6 (declaração de lacuna no idioma do usuário) esclarecidos; passo 9 inclui o ADR; premissa de E2E e de idioma | Auditoria: ambiguidade na citação deduplicada e conflito entre "declaração fixa" e resposta em pt-BR; `RULES.md` §5 pede ADR |

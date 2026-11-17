@@ -1,3 +1,6 @@
+/** Connections the user may attach to one message (`connectionIds`). */
+export const MAX_ATTACHED_CONNECTIONS = 10;
+
 export const EXPERT_LIMITS = {
   /** Characters of one message from the user. */
   contentMax: 4000,

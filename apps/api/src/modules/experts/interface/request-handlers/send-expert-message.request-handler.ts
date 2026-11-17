@@ -5,6 +5,8 @@ import { type ActiveSession, CurrentSession } from "../../../auth";
 import { RateLimit } from "../../../rate-limit";
 import { SendExpertMessage } from "../../application/use-cases/send-expert-message.use-case";
 import {
+  ConnectionNotFoundError,
+  ConnectionNotReadyError,
   ConversationBusyError,
   ExpertNotFoundError,
   ExpertUnavailableError,
@@ -30,7 +32,10 @@ export class SendExpertMessageRequestHandler {
    * with the usual error envelope; after the stream starts, a failure is an `error` event.
    * The conversation is read from and written to the database for the session user (the body
    * carries only `content`); a second answer for the same user and expert gets `409
-   * CONVERSATION_BUSY`. Limited per IP: the limiter runs before authentication.
+   * CONVERSATION_BUSY`. `connectionIds` (spec 0024) limit the search to the attached files; one
+   * that is not the user's (or does not exist) answers `404 CONNECTION_NOT_FOUND` and one that is
+   * not `ready` answers `409 CONNECTION_NOT_READY`, both before the stream. Limited per IP: the
+   * limiter runs before authentication.
    */
   @Post(":expertId/messages")
   @RateLimit("expert-message")
@@ -58,6 +63,7 @@ export class SendExpertMessageRequestHandler {
         userId: session.userId,
         expertId,
         content: body.content,
+        connectionIds: body.connectionIds,
         signal: abort.signal,
       });
     } catch (error) {
@@ -66,6 +72,22 @@ export class SendExpertMessageRequestHandler {
           HttpStatus.CONFLICT,
           "CONVERSATION_BUSY",
           "This expert is still answering.",
+        );
+      }
+
+      if (error instanceof ConnectionNotFoundError) {
+        throw new ApiException(
+          HttpStatus.NOT_FOUND,
+          "CONNECTION_NOT_FOUND",
+          "One of the attached files was not found.",
+        );
+      }
+
+      if (error instanceof ConnectionNotReadyError) {
+        throw new ApiException(
+          HttpStatus.CONFLICT,
+          "CONNECTION_NOT_READY",
+          "One of the attached files is not ready yet.",
         );
       }
 

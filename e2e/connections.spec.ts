@@ -27,6 +27,9 @@ async function openHome(page: Page, label: string, { acceptedPrivacy = true } = 
   );
   await page.goto("/app");
   await expect(page.getByRole("combobox", { name: "Expert" })).toBeVisible();
+  // The stored conversation loads first and rebuilds the composer: wait for it, or the button
+  // that a test focuses can be replaced under load.
+  await expect(page.getByRole("textbox", { name: /^Message for the/ })).toBeEnabled();
 }
 
 const plan = () =>

@@ -1,4 +1,5 @@
 import type { ExpertId } from "./expert";
+import type { Citation } from "./grounding";
 
 export type StoredMessageRole = "user" | "assistant";
 
@@ -10,6 +11,11 @@ export interface StoredMessage {
   role: StoredMessageRole;
   content: string;
   status: StoredMessageStatus;
+  /**
+   * The sources of an answer. `null`: no retrieval ran. `[]`: it ran and no source covers the
+   * question. Never holds chunk text.
+   */
+  citations: Citation[] | null;
   createdAt: Date;
 }
 
@@ -17,6 +23,8 @@ export interface NewMessage {
   role: StoredMessageRole;
   content: string;
   status: StoredMessageStatus;
+  /** Same meaning as `StoredMessage.citations`; absent is `null`. */
+  citations?: readonly Citation[] | null;
 }
 
 export interface MessagePage {

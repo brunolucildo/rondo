@@ -47,3 +47,27 @@ export class ConversationStorageError extends Error {
     this.name = "ConversationStorageError";
   }
 }
+
+/** The embeddings or the vector index could not serve the retrieval of the question. */
+export class ExpertKnowledgeUnavailableError extends Error {
+  constructor() {
+    super("The knowledge base is unavailable right now.");
+    this.name = "ExpertKnowledgeUnavailableError";
+  }
+}
+
+/** A `connectionIds` entry is not a connection of the user (or does not exist). */
+export class ConnectionNotFoundError extends Error {
+  constructor() {
+    super("Connection not found.");
+    this.name = "ConnectionNotFoundError";
+  }
+}
+
+/** A `connectionIds` entry is a connection of the user that is not `ready` yet (or failed). */
+export class ConnectionNotReadyError extends Error {
+  constructor() {
+    super("The connection is not ready.");
+    this.name = "ConnectionNotReadyError";
+  }
+}

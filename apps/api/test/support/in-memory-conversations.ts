@@ -20,7 +20,12 @@ export class InMemoryConversationRepository implements ConversationRepository {
   /** The next call fails once with this error (to test what happens when storage is down). */
   failNext: { method: "listPage" | "append" | "remove" | "clear"; error: Error } | null = null;
   /** Every call to `append` and `remove`, in order. */
-  readonly writes: Array<{ kind: "append" | "remove"; role?: string; content?: string }> = [];
+  readonly writes: Array<{
+    kind: "append" | "remove";
+    role?: string;
+    content?: string;
+    citations?: NewMessage["citations"];
+  }> = [];
 
   private key(userId: string, expertId: ExpertId): string {
     return `${userId}|${expertId}`;
@@ -52,9 +57,11 @@ export class InMemoryConversationRepository implements ConversationRepository {
   }
 
   private push(userId: string, expertId: ExpertId, message: NewMessage): StoredMessage {
+    const { citations, ...rest } = message;
     const stored: StoredMessage = {
       id: randomUUID(),
-      ...message,
+      ...rest,
+      citations: citations === undefined || citations === null ? null : [...citations],
       createdAt: new Date(Date.UTC(2026, 10, 17, 12, 0, 0) + (this.tick += 1) * 1000),
     };
     const key = this.key(userId, expertId);
@@ -103,7 +110,12 @@ export class InMemoryConversationRepository implements ConversationRepository {
       return Promise.reject(error as Error);
     }
 
-    this.writes.push({ kind: "append", role: message.role, content: message.content });
+    this.writes.push({
+      kind: "append",
+      role: message.role,
+      content: message.content,
+      citations: message.citations,
+    });
 
     const stored = this.push(userId, expertId, message);
 

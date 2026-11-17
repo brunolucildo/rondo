@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { ExpertAnswerEvent } from "../domain/expert-ports";
-import { ANSWER_FAILED_MESSAGE, type StreamResponse, writeAnswerStream } from "./answer-stream";
+import {
+  ANSWER_FAILED_MESSAGE,
+  KNOWLEDGE_UNAVAILABLE_MESSAGE,
+  type StreamResponse,
+  writeAnswerStream,
+} from "./answer-stream";
 
 function fakeResponse() {
   const written: string[] = [];
@@ -74,6 +79,51 @@ describe("writeAnswerStream (R5, R8)", () => {
     );
     expect(result).toMatchObject({ outcome: "failure", reason: "provider_error" });
     expect(response.writableEnded).toBe(true);
+  });
+
+  it("writes the citations event right before done, with the sources and nothing else", async () => {
+    const { response, written } = fakeResponse();
+    const citation = { connectionId: "c1", sourceName: "plano.pdf", page: 2, position: 3 };
+
+    await writeAnswerStream(
+      response,
+      events(
+        { type: "text", text: "Resposta" },
+        { type: "citations", citations: [citation] },
+        { type: "done", usage: null },
+      ),
+    );
+
+    expect(written).toEqual([
+      "<headers flushed>",
+      'event: delta\ndata: {"text":"Resposta"}\n\n',
+      `event: citations\ndata: ${JSON.stringify({ citations: [citation] })}\n\n`,
+      "event: done\ndata: {}\n\n",
+    ]);
+  });
+
+  it("writes an empty citations list for the gap", async () => {
+    const { response, written } = fakeResponse();
+
+    await writeAnswerStream(
+      response,
+      events({ type: "citations", citations: [] }, { type: "done", usage: null }),
+    );
+
+    expect(written).toContain('event: citations\ndata: {"citations":[]}\n\n');
+  });
+
+  it("writes KNOWLEDGE_UNAVAILABLE when the sources could not be searched", async () => {
+    const { response, written } = fakeResponse();
+    const result = await writeAnswerStream(
+      response,
+      events({ type: "failed", reason: "knowledge_unavailable" }),
+    );
+
+    expect(written.at(-1)).toBe(
+      `event: error\ndata: ${JSON.stringify({ code: "KNOWLEDGE_UNAVAILABLE", message: KNOWLEDGE_UNAVAILABLE_MESSAGE })}\n\n`,
+    );
+    expect(result).toMatchObject({ outcome: "failure", reason: "knowledge_unavailable" });
   });
 
   it("reports a timeout failure", async () => {

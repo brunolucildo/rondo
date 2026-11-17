@@ -346,6 +346,7 @@ describe("conversation API with a fake model (R2 to R10)", () => {
       expect(first.messages.at(-1)?.content).toBe("message 120");
       expect(first.nextCursor).toEqual(expect.any(String));
       expect(Object.keys(first.messages[0] ?? {}).sort()).toEqual([
+        "citations",
         "content",
         "createdAt",
         "id",

@@ -12,14 +12,17 @@ export interface StreamResponse {
 }
 
 export const ANSWER_FAILED_MESSAGE = "The expert couldn't answer.";
+export const KNOWLEDGE_UNAVAILABLE_MESSAGE = "We couldn't search your sources right now.";
 
 function frame(event: string, data: unknown): string {
   return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
 }
 
 /**
- * Writes the answer as Server-Sent Events: `delta` (`{ text }`) for each piece, then `done`, or
- * `error` (`{ code, message }`) when the model failed. A client that left (Stop, closed tab)
+ * Writes the answer as Server-Sent Events: `delta` (`{ text }`) for each piece, then `citations`
+ * (`{ citations }`, only when the retrieval ran; an empty list means no source covers the
+ * question) and `done`, or `error` (`{ code, message }`) when the model failed
+ * (`EXPERT_ANSWER_FAILED`) or the sources could not be searched (`KNOWLEDGE_UNAVAILABLE`). A client that left (Stop, closed tab)
  * gets nothing more. Returns what happened, for the telemetry; the text itself is never kept.
  */
 export async function writeAnswerStream(
@@ -46,6 +49,9 @@ export async function writeAnswerStream(
       case "text":
         response.write(frame("delta", { text: event.text }));
         break;
+      case "citations":
+        response.write(frame("citations", { citations: event.citations }));
+        break;
       case "done":
         response.write(frame("done", {}));
         result = {
@@ -57,7 +63,12 @@ export async function writeAnswerStream(
         break;
       case "failed":
         response.write(
-          frame("error", { code: "EXPERT_ANSWER_FAILED", message: ANSWER_FAILED_MESSAGE }),
+          event.reason === "knowledge_unavailable"
+            ? frame("error", {
+                code: "KNOWLEDGE_UNAVAILABLE",
+                message: KNOWLEDGE_UNAVAILABLE_MESSAGE,
+              })
+            : frame("error", { code: "EXPERT_ANSWER_FAILED", message: ANSWER_FAILED_MESSAGE }),
         );
         result = {
           outcome: "failure",

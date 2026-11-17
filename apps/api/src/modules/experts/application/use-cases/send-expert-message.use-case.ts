@@ -3,19 +3,32 @@ import { buildConversation, type ModelMessage } from "../../domain/expert-conver
 import { findExpert } from "../../domain/expert-catalog";
 import {
   ConversationBusyError,
+  ExpertKnowledgeUnavailableError,
   ExpertModelError,
   ExpertNotFoundError,
   ExpertUnavailableError,
 } from "../../domain/expert-errors";
-import type { ExpertAnswerEvent, ExpertOrchestrator, TokenUsage } from "../../domain/expert-ports";
+import type {
+  ConnectionSources,
+  ExpertAnswerEvent,
+  ExpertOrchestrator,
+  RetrievalRequest,
+  TokenUsage,
+} from "../../domain/expert-ports";
 import { EXPERT_LIMITS } from "../../domain/expert-rules";
 import type { ExpertId } from "../../domain/expert";
+import type { Citation } from "../../domain/grounding";
 
 export interface SendExpertMessageInput {
   /** The user of the session: the only owner of the conversation this call reads and writes. */
   userId: string;
   expertId: string;
   content: string;
+  /**
+   * Connections the user attached to this message (already validated as a list of UUIDs, at most
+   * 10). The search is limited to them; absent or empty searches the whole base of the user.
+   */
+  connectionIds?: readonly string[];
   /** Aborted when the caller leaves (client disconnected or pressed Stop). */
   signal: AbortSignal;
 }
@@ -40,6 +53,12 @@ const DEFAULT_TIMEOUTS: SendExpertMessageTimeouts = {
   totalMs: EXPERT_LIMITS.totalTimeoutMs,
 };
 
+/** The sources of a user without connections: nothing is ready, so nothing is retrieved. */
+const NO_SOURCES: ConnectionSources = {
+  assertAttachable: () => Promise.resolve(),
+  hasReadyConnection: () => Promise.resolve(false),
+};
+
 /** One try plus one retry, and the retry only happens before the first token. */
 const MAX_ATTEMPTS = 2;
 
@@ -48,7 +67,7 @@ const STOPPED = Symbol("stopped");
 type AttemptResult =
   | { kind: "completed"; usage: TokenUsage | null }
   | { kind: "stopped"; emitted: boolean }
-  | { kind: "failed"; retryable: boolean; emitted: boolean };
+  | { kind: "failed"; retryable: boolean; emitted: boolean; knowledge: boolean };
 
 /**
  * Answers one message of one expert as a stream of events and keeps the conversation. The expert
@@ -62,6 +81,15 @@ type AttemptResult =
  * half way. When no text arrived, the question is taken back, so "Try again" never leaves the
  * same question twice in the conversation.
  *
+ * Retrieval (spec 0024): when the message carries `connectionIds` they are checked first (they
+ * must be the user's and `ready`: `ConnectionNotFoundError` or `ConnectionNotReadyError` before any
+ * event exists) and the search is limited to them; otherwise the whole base is searched, but only
+ * when the user has a `ready` connection (without one nothing is retrieved and the answer goes as
+ * before). The orchestrator reports the citations built from the retrieved chunks; they are stored
+ * with the answer (also a partial one) and passed on right before `done`. When the retrieval fails
+ * the stream ends with `knowledge_unavailable` and the question stays stored (the next send of
+ * the same text reuses it instead of duplicating it).
+ *
  * Policy: 30 s without a first token and 120 s in total, and one new attempt when the model
  * fails (or is silent) before the first token. After the first token there is no retry: the text
  * already sent stays and the stream ends with `failed`.
@@ -72,6 +100,7 @@ export class SendExpertMessage {
     private readonly conversations: ConversationRepository,
     private readonly lock: ConversationLock,
     private readonly timeouts: SendExpertMessageTimeouts = DEFAULT_TIMEOUTS,
+    private readonly sources: ConnectionSources = NO_SOURCES,
   ) {}
 
   async execute(input: SendExpertMessageInput): Promise<SentExpertMessage> {
@@ -85,6 +114,7 @@ export class SendExpertMessage {
       throw new ExpertUnavailableError();
     }
 
+    const retrieval = await this.planRetrieval(input);
     const release = this.lock.tryAcquire(input.userId, expert.id);
 
     if (release === null) {
@@ -96,20 +126,30 @@ export class SendExpertMessage {
         limit: EXPERT_LIMITS.contextMessages,
         before: null,
       });
-      const question = await this.conversations.append(input.userId, expert.id, {
-        role: "user",
-        content: input.content,
-        status: "complete",
-      });
+      // A question left without an answer by a failed retrieval is asked again with the same
+      // text ("Try again"): that stored question is reused, not stored a second time.
+      const pending = context.messages.at(-1);
+      const reusable = pending?.role === "user" && pending.content === input.content;
+      const history = reusable ? context.messages.slice(0, -1) : context.messages;
+      const questionId = reusable
+        ? pending.id
+        : (
+            await this.conversations.append(input.userId, expert.id, {
+              role: "user",
+              content: input.content,
+              status: "complete",
+            })
+          ).id;
 
       return {
         events: this.keepAnswer(
           input.userId,
           expert.id,
-          question.id,
+          questionId,
           this.run(
             expert.id,
-            buildConversation(expert, context.messages, input.content),
+            buildConversation(expert, history, input.content),
+            retrieval,
             input.signal,
           ),
           release,
@@ -120,6 +160,24 @@ export class SendExpertMessage {
       release();
       throw error;
     }
+  }
+
+  /**
+   * Decides what to retrieve, before anything is stored or streamed. `null`: nothing (the user
+   * has no ready connection).
+   */
+  private async planRetrieval(input: SendExpertMessageInput): Promise<RetrievalRequest | null> {
+    const connectionIds = [...new Set(input.connectionIds ?? [])];
+
+    if (connectionIds.length > 0) {
+      await this.sources.assertAttachable(input.userId, connectionIds);
+
+      return { userId: input.userId, question: input.content, connectionIds };
+    }
+
+    return (await this.sources.hasReadyConnection(input.userId))
+      ? { userId: input.userId, question: input.content, connectionIds: null }
+      : null;
   }
 
   /**
@@ -135,18 +193,23 @@ export class SendExpertMessage {
   ): AsyncGenerator<ExpertAnswerEvent> {
     let text = "";
     let settled = false;
+    /** `null`: no retrieval ran; the last one reported wins (a retry runs it again). */
+    let citations: Citation[] | null = null;
 
-    const settle = async (complete: boolean): Promise<boolean> => {
+    const settle = async (complete: boolean, keepQuestion: boolean): Promise<boolean> => {
       settled = true;
 
       try {
         if (text.trim() === "") {
-          await this.conversations.remove(userId, questionId);
+          if (!keepQuestion) {
+            await this.conversations.remove(userId, questionId);
+          }
         } else {
           await this.conversations.append(userId, expertId, {
             role: "assistant",
             content: text,
             status: complete ? "complete" : "incomplete",
+            citations,
           });
         }
 
@@ -162,8 +225,19 @@ export class SendExpertMessage {
         if (event.type === "text") {
           text += event.text;
           yield event;
+        } else if (event.type === "citations") {
+          citations = event.citations;
         } else {
-          const stored = await settle(event.type === "done");
+          // The question of a failed retrieval stays: the user asked it and the answer was
+          // never started (BUSINESS.md: the user's message is never lost).
+          const stored = await settle(
+            event.type === "done",
+            event.type === "failed" && event.reason === "knowledge_unavailable",
+          );
+
+          if (event.type === "done" && stored && citations !== null) {
+            yield { type: "citations", citations };
+          }
 
           yield stored || event.type === "aborted"
             ? event
@@ -172,7 +246,7 @@ export class SendExpertMessage {
       }
     } finally {
       if (!settled) {
-        await settle(false);
+        await settle(false, false);
       }
 
       release();
@@ -182,6 +256,7 @@ export class SendExpertMessage {
   private async *run(
     expertId: ExpertId,
     messages: readonly ModelMessage[],
+    retrieval: RetrievalRequest | null,
     caller: AbortSignal,
   ): AsyncGenerator<ExpertAnswerEvent> {
     if (caller.aborted) {
@@ -203,7 +278,7 @@ export class SendExpertMessage {
 
     try {
       for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
-        const result = yield* this.attempt(expertId, messages, total.signal);
+        const result = yield* this.attempt(expertId, messages, retrieval, total.signal);
 
         if (result.kind === "completed") {
           yield { type: "done", usage: result.usage };
@@ -217,6 +292,12 @@ export class SendExpertMessage {
 
         if (state.stop === "timeout") {
           yield { type: "failed", reason: "timeout" };
+          return;
+        }
+
+        if (result.kind === "failed" && result.knowledge) {
+          // The embeddings and the index already retry on their own: no new attempt here.
+          yield { type: "failed", reason: "knowledge_unavailable" };
           return;
         }
 
@@ -238,6 +319,7 @@ export class SendExpertMessage {
   private async *attempt(
     expertId: ExpertId,
     messages: readonly ModelMessage[],
+    retrieval: RetrievalRequest | null,
     total: AbortSignal,
   ): AsyncGenerator<ExpertAnswerEvent, AttemptResult> {
     const attempt = new AbortController();
@@ -256,7 +338,7 @@ export class SendExpertMessage {
     }
 
     const iterator = this.orchestrator
-      .answer({ expertId, messages, signal: attempt.signal })
+      .answer({ expertId, messages, retrieval, signal: attempt.signal })
       [Symbol.asyncIterator]();
 
     try {
@@ -281,6 +363,12 @@ export class SendExpertMessage {
           continue;
         }
 
+        if (step.value.type === "citations") {
+          // Not a token: the first-token clock and the retry rule keep waiting for text.
+          yield { type: "citations", citations: step.value.citations };
+          continue;
+        }
+
         if (!emitted) {
           emitted = true;
           clearTimeout(firstTokenTimer);
@@ -297,6 +385,7 @@ export class SendExpertMessage {
         kind: "failed",
         retryable: error instanceof ExpertModelError ? error.retryable : true,
         emitted,
+        knowledge: error instanceof ExpertKnowledgeUnavailableError,
       };
     } finally {
       clearTimeout(firstTokenTimer);

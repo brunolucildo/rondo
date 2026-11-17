@@ -11,6 +11,7 @@ import type {
 import { ConversationStorageError } from "../domain/expert-errors";
 import { EXPERT_LIMITS } from "../domain/expert-rules";
 import type { ExpertId } from "../domain/expert";
+import { parseStoredCitations } from "../domain/grounding";
 
 type Row = Record<string, unknown>;
 
@@ -24,8 +25,10 @@ const toDate = (value: unknown): Date | null => {
 
 function toMessage(row: Row): StoredMessage | null {
   const createdAt = toDate(row.created_at);
+  const citations = parseStoredCitations(row.citations ?? null);
 
   if (
+    citations === undefined ||
     typeof row.id !== "string" ||
     (row.role !== "user" && row.role !== "assistant") ||
     typeof row.content !== "string" ||
@@ -35,7 +38,14 @@ function toMessage(row: Row): StoredMessage | null {
     return null;
   }
 
-  return { id: row.id, role: row.role, content: row.content, status: row.status, createdAt };
+  return {
+    id: row.id,
+    role: row.role,
+    content: row.content,
+    status: row.status,
+    citations,
+    createdAt,
+  };
 }
 
 /**
@@ -57,7 +67,7 @@ export class PostgresConversationRepository implements ConversationRepository {
       // of a message of this very conversation: an id from another conversation matches nothing.
       const result = await this.database.query<Row>(
         { operation: "select", collection: "expert_messages" },
-        `select m.id, m.role, m.content, m.status, m.created_at
+        `select m.id, m.role, m.content, m.status, m.citations, m.created_at
            from public.expert_messages m
            join public.expert_conversations c on c.id = m.conversation_id
           where c.user_id = $1
@@ -102,7 +112,7 @@ export class PostgresConversationRepository implements ConversationRepository {
     try {
       const result = await this.database.query<Row>(
         { operation: "rpc", procedure: "expert_append_message" },
-        "select message_id, message_created_at from public.expert_append_message($1, $2, $3, $4, $5, $6)",
+        "select message_id, message_created_at from public.expert_append_message($1, $2, $3, $4, $5, $6, $7::jsonb)",
         [
           userId,
           expertId,
@@ -110,6 +120,9 @@ export class PostgresConversationRepository implements ConversationRepository {
           message.content,
           message.status,
           EXPERT_LIMITS.conversationMessagesMax,
+          message.citations === undefined || message.citations === null
+            ? null
+            : JSON.stringify(message.citations),
         ],
       );
 

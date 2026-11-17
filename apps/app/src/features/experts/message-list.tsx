@@ -2,6 +2,7 @@ import { Alert } from "@repo/ui/alert";
 import { Button } from "@repo/ui/button";
 import { YellowCardIcon } from "@repo/ui/icons";
 import { Spinner } from "@repo/ui/spinner";
+import { AnswerSources } from "./answer-sources";
 import { ExpertAvatar } from "./expert-avatar";
 import type { ChatMessage, ExpertMessage } from "./chat-state";
 import type { Expert } from "./use-experts";
@@ -17,6 +18,8 @@ function failureText(status: ExpertMessage["status"]): string | null {
       return "You're sending messages too fast. Wait a moment and try again.";
     case "busy":
       return "This expert is still answering.";
+    case "knowledge-unavailable":
+      return "We couldn't search your sources right now.";
     default:
       return null;
   }
@@ -53,6 +56,7 @@ function ExpertBubble({
             {message.content}
           </p>
         ) : null}
+        {message.content !== "" ? <AnswerSources citations={message.citations} /> : null}
         {message.status === "streaming" && message.content === "" ? (
           <p className="flex items-center gap-3 rounded-md border-2 border-border bg-card px-4 py-3 text-base text-muted-foreground shadow-pixel-sm">
             <Spinner className="size-6" />

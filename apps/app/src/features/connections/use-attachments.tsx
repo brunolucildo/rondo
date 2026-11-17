@@ -43,6 +43,8 @@ interface Attachment {
   connectionId: string | null;
   /** Why the upload itself was refused or failed. */
   rejection: FailureMessage | null;
+  /** Why the server refused to use this file in an answer (set after a send that did not go). */
+  problem: string | null;
 }
 
 type Action =
@@ -50,6 +52,7 @@ type Action =
   | { type: "sent"; id: string; connectionId: string }
   | { type: "rejected"; id: string; rejection: FailureMessage }
   | { type: "restarted"; id: string }
+  | { type: "flagged"; ids: readonly string[]; problem: string }
   | { type: "removed"; id: string }
   | { type: "cleared"; ids: readonly string[] };
 
@@ -60,7 +63,7 @@ function reducer(state: readonly Attachment[], action: Action): Attachment[] {
     case "sent":
       return state.map((item) =>
         item.id === action.id
-          ? { ...item, connectionId: action.connectionId, rejection: null }
+          ? { ...item, connectionId: action.connectionId, rejection: null, problem: null }
           : item,
       );
     case "rejected":
@@ -69,7 +72,13 @@ function reducer(state: readonly Attachment[], action: Action): Attachment[] {
       );
     case "restarted":
       return state.map((item) =>
-        item.id === action.id ? { ...item, connectionId: null, rejection: null } : item,
+        item.id === action.id
+          ? { ...item, connectionId: null, rejection: null, problem: null }
+          : item,
+      );
+    case "flagged":
+      return state.map((item) =>
+        action.ids.includes(item.id) ? { ...item, problem: action.problem } : item,
       );
     case "removed":
       return state.filter((item) => item.id !== action.id);
@@ -77,6 +86,11 @@ function reducer(state: readonly Attachment[], action: Action): Attachment[] {
       return state.filter((item) => !action.ids.includes(item.id));
   }
 }
+
+const PROBLEM_TEXT = {
+  "not-found": "This file is no longer available. Remove it and attach it again.",
+  "not-ready": "This file is not ready yet. Remove it or wait a moment and try again.",
+} as const;
 
 function readPrivacyAccepted(): boolean {
   try {
@@ -115,13 +129,20 @@ function connectionQuery(connectionId: string) {
 
 interface AttachmentsContextValue {
   attachments: readonly AttachmentView[];
-  /** True while a file is uploading or processing: `Send` must wait. */
+  /** True while a file is uploading, processing or was refused by the server: `Send` must wait. */
   isBusy: boolean;
   addFile: (file: File) => void;
   removeAttachment: (id: string) => void;
   retryAttachment: (id: string) => void;
   /** Drops the chips that are not in progress (the message was sent). */
   clearSettled: () => void;
+  /**
+   * The ids of the connections of the files that are ready: what the next message carries so the
+   * expert answers from them. Each connection once, even when the same file was attached twice.
+   */
+  readyConnectionIds: readonly string[];
+  /** Marks the ready files as the cause of a refused send; the chip says what to do. */
+  flagProblem: (problem: "not-found" | "not-ready") => void;
 }
 
 const AttachmentsContext = createContext<AttachmentsContextValue | null>(null);
@@ -136,6 +157,10 @@ function viewOf(item: Attachment, connection: ConnectionDto | undefined): Attach
       message: item.rejection.text,
       canRetry: item.rejection.retryable,
     };
+  }
+
+  if (item.problem !== null) {
+    return { ...base, phase: "failed", message: item.problem, canRetry: false };
   }
 
   if (item.connectionId === null) {
@@ -204,7 +229,10 @@ export function AttachmentsProvider({ children }: { children: ReactNode }) {
       const id = `attachment-${counter.current}`;
       const refusal = checkFileBeforeUpload(file);
 
-      dispatch({ type: "added", attachment: { id, file, connectionId: null, rejection: refusal } });
+      dispatch({
+        type: "added",
+        attachment: { id, file, connectionId: null, rejection: refusal, problem: null },
+      });
 
       if (refusal === null) {
         void send(id, file);
@@ -226,7 +254,11 @@ export function AttachmentsProvider({ children }: { children: ReactNode }) {
 
   const value: AttachmentsContextValue = {
     attachments: views,
-    isBusy: views.some((view) => view.phase === "uploading" || view.phase === "processing"),
+    // A file the server refused to use also holds the message back: sending without it would
+    // silently widen the search to the whole base.
+    isBusy:
+      items.some((item) => item.problem !== null) ||
+      views.some((view) => view.phase === "uploading" || view.phase === "processing"),
     addFile,
     removeAttachment: (id) => dispatch({ type: "removed", id }),
     retryAttachment: (id) => {
@@ -237,6 +269,21 @@ export function AttachmentsProvider({ children }: { children: ReactNode }) {
         void send(id, item.file);
       }
     },
+    readyConnectionIds: [
+      ...new Set(
+        items.flatMap((item, position) =>
+          views[position]?.phase === "ready" && item.connectionId !== null
+            ? [item.connectionId]
+            : [],
+        ),
+      ),
+    ],
+    flagProblem: (problem) =>
+      dispatch({
+        type: "flagged",
+        ids: views.filter((view) => view.phase === "ready").map((view) => view.id),
+        problem: PROBLEM_TEXT[problem],
+      }),
     clearSettled: () =>
       dispatch({
         type: "cleared",

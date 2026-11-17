@@ -8,7 +8,20 @@ export type ExpertMessageStatus =
   | "error"
   | "unavailable"
   | "rate-limited"
-  | "busy";
+  | "busy"
+  | "knowledge-unavailable";
+
+/**
+ * A source an answer used, as the server built it. It has no text of the chunk on purpose: the
+ * server never stores it either.
+ */
+export interface Citation {
+  connectionId: string;
+  sourceName: string;
+  /** One-based, or `null` for a source without pages. */
+  page: number | null;
+  position: number;
+}
 
 export interface UserMessage {
   id: string;
@@ -21,6 +34,11 @@ export interface ExpertMessage {
   role: "expert";
   content: string;
   status: ExpertMessageStatus;
+  /**
+   * The sources of the answer. `null`: no search ran (the user had no connected file). `[]`: it ran
+   * and no connected source covers the question.
+   */
+  citations: Citation[] | null;
 }
 
 export type ChatMessage = UserMessage | ExpertMessage;
@@ -31,6 +49,8 @@ export interface StoredMessage {
   role: "user" | "assistant";
   content: string;
   status: "complete" | "incomplete";
+  /** Absent in answers stored before the sources existed. */
+  citations?: Citation[] | null;
   createdAt: string;
 }
 
@@ -44,6 +64,7 @@ export function fromStoredMessages(stored: readonly StoredMessage[]): ChatMessag
           role: "expert",
           content: message.content,
           status: message.status === "incomplete" ? "incomplete" : "done",
+          citations: message.citations ?? null,
         },
   );
 }
@@ -53,7 +74,14 @@ export type ChatAction =
   | { type: "delta"; id: string; text: string }
   | { type: "finished"; id: string }
   | { type: "stopped"; id: string }
-  | { type: "failed"; id: string; status: "error" | "unavailable" | "rate-limited" | "busy" }
+  | { type: "citations"; id: string; citations: Citation[] }
+  | {
+      type: "failed";
+      id: string;
+      status: "error" | "unavailable" | "rate-limited" | "busy" | "knowledge-unavailable";
+    }
+  /** The server refused the attached files before answering: the question and its answer go. */
+  | { type: "unsent"; id: string }
   /** Drops the failed answer and puts a new empty one in its place, for "Try again". */
   | { type: "retried"; id: string; newId: string }
   /** The conversation was deleted on the server. */
@@ -75,13 +103,25 @@ export function chatReducer(messages: ChatMessage[], action: ChatAction): ChatMe
       return [
         ...messages,
         { id: action.userId, role: "user", content: action.content },
-        { id: action.expertId, role: "expert", content: "", status: "streaming" },
+        { id: action.expertId, role: "expert", content: "", status: "streaming", citations: null },
       ];
     case "delta":
       return patchExpert(messages, action.id, (message) => ({
         ...message,
         content: message.content + action.text,
       }));
+    case "citations":
+      return patchExpert(messages, action.id, (message) => ({
+        ...message,
+        citations: action.citations,
+      }));
+    case "unsent": {
+      const at = messages.findIndex(
+        (message) => message.role === "expert" && message.id === action.id,
+      );
+
+      return at < 1 ? [...messages] : [...messages.slice(0, at - 1), ...messages.slice(at + 1)];
+    }
     case "finished":
       return patchExpert(messages, action.id, (message) => ({ ...message, status: "done" }));
     case "stopped":
@@ -95,7 +135,7 @@ export function chatReducer(messages: ChatMessage[], action: ChatAction): ChatMe
     case "retried":
       return messages.map((message) =>
         message.role === "expert" && message.id === action.id
-          ? { id: action.newId, role: "expert", content: "", status: "streaming" }
+          ? { id: action.newId, role: "expert", content: "", status: "streaming", citations: null }
           : message,
       );
     case "cleared":

@@ -4,5 +4,9 @@ export {
   type ExpertChatConfig,
   parseExpertChatConfig,
 } from "./domain/expert-chat-config";
+export {
+  type ExpertRetrievalConfig,
+  parseExpertRetrievalConfig,
+} from "./domain/expert-retrieval-config";
 export { ExpertsModule } from "./experts.module";
 export { EXPERT_ORCHESTRATOR } from "./experts.tokens";

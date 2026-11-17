@@ -89,6 +89,8 @@ import { UploadConnectionRequestHandler } from "./interface/request-handlers/upl
       useFactory: (repository: ConnectionRepository) => new GetConnection(repository),
     },
   ],
+  // The experts read the status of the user's connections (spec 0024) through this port.
+  exports: [CONNECTION_REPOSITORY],
 })
 export class ConnectionsModule implements OnApplicationShutdown {
   constructor(
