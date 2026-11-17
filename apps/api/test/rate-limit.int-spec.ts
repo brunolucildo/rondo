@@ -73,6 +73,7 @@ describe("Rate limiting", () => {
       authJwtSecret: "test-only-jwt-secret-0123456789-abcdefghij",
       authHashConcurrency: 3,
       authHashQueueLimit: 64,
+      expertChat: { provider: "fake" },
       trustProxy,
       email: { provider: "capture", from: { name: "Test", address: "no-reply@test.local" } },
     };

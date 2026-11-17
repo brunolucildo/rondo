@@ -105,7 +105,7 @@ test.describe("sign-in page", () => {
     await page.keyboard.press("Enter");
 
     await expect(page).toHaveURL(`${APP_URL}/app`);
-    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Welcome, Dora");
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Chat with the experts");
     expect(await storedToken(page)).toBeTruthy();
 
     await expect
@@ -197,7 +197,7 @@ test.describe("full flow and a single session per user", () => {
 
     await page.goto(link);
     await expect(page).toHaveURL(`${APP_URL}/app`);
-    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Welcome, Ana");
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Chat with the experts");
 
     // The confirmation signs in without a "new sign-in" notice: that is for the sign-in only.
     expect(await mailTo(request, email, NEW_SESSION_SUBJECT)).toEqual([]);
@@ -209,7 +209,7 @@ test.describe("full flow and a single session per user", () => {
 
     await fillAndSubmit(page, email, password);
     await expect(page).toHaveURL(`${APP_URL}/app`);
-    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Welcome, Ana");
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Chat with the experts");
 
     await expect
       .poll(async () => (await mailTo(request, email, NEW_SESSION_SUBJECT)).length, {
@@ -225,7 +225,7 @@ test.describe("full flow and a single session per user", () => {
       await otherPage.goto("/auth/sign-in");
       await fillAndSubmit(otherPage, email, password);
       await expect(otherPage).toHaveURL(`${APP_URL}/app`);
-      await expect(otherPage.getByRole("heading", { level: 1 })).toHaveText("Welcome, Ana");
+      await expect(otherPage.getByRole("heading", { level: 1 })).toHaveText("Chat with the experts");
 
       await page.goto("/app");
       await expect(page).toHaveURL(`${APP_URL}/auth/sign-in`);
@@ -234,7 +234,7 @@ test.describe("full flow and a single session per user", () => {
 
       // The second browser keeps working.
       await otherPage.goto("/app");
-      await expect(otherPage.getByRole("heading", { level: 1 })).toHaveText("Welcome, Ana");
+      await expect(otherPage.getByRole("heading", { level: 1 })).toHaveText("Chat with the experts");
     } finally {
       await other.close();
     }

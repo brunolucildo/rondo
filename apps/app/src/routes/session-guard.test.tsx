@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ACCESS_TOKEN_KEY, setAccessToken } from "../lib/access-token";
 import {
+  HOME_HEADING,
   jsonResponse,
   renderApp,
   SESSION_USER,
@@ -57,11 +58,11 @@ describe("/app is private (R7, R8, R10)", () => {
 
       release(sessionOk());
 
-      expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent("Welcome, Ana");
+      expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent(HOME_HEADING);
       expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
-      expect(screen.getByText("You are signed in.")).toBeInTheDocument();
       expect(screen.queryByText("Hello World")).not.toBeInTheDocument();
-      expect(screen.queryByRole("status")).not.toBeInTheDocument();
+      // The catalog of experts loads after the session check; its own status ends with it.
+      await waitFor(() => expect(screen.queryByRole("status")).not.toBeInTheDocument());
       expect(router.state.location.pathname).toBe("/app");
       expect(fetchMock).toHaveBeenCalledTimes(1);
 
@@ -75,7 +76,7 @@ describe("/app is private (R7, R8, R10)", () => {
       stubSessionFetch(sessionOk);
       const { router } = renderApp("/");
 
-      expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent("Welcome, Ana");
+      expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent(HOME_HEADING);
       expect(router.state.location.pathname).toBe("/app");
     });
 
@@ -85,7 +86,7 @@ describe("/app is private (R7, R8, R10)", () => {
 
       await waitFor(() => expect(router.state.location.pathname).toBe("/auth/sign-in"));
       expect(window.localStorage.getItem(ACCESS_TOKEN_KEY)).toBeNull();
-      expect(screen.queryByText(/Welcome/)).not.toBeInTheDocument();
+      expect(screen.queryByRole("heading", { level: 1, name: HOME_HEADING })).not.toBeInTheDocument();
     });
 
     it.each([
@@ -104,18 +105,16 @@ describe("/app is private (R7, R8, R10)", () => {
 
       await user.click(screen.getByRole("button", { name: "Try again" }));
 
-      expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent("Welcome, Ana");
+      expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent(HOME_HEADING);
     });
 
-    it("escapes the name it shows", async () => {
+    it("never turns the name of the session into markup", async () => {
       stubSessionFetch(() =>
         jsonResponse(200, { user: { ...SESSION_USER, firstName: "<img src=x onerror=alert(1)>" } }),
       );
       renderApp("/app");
 
-      expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent(
-        "Welcome, <img src=x onerror=alert(1)>",
-      );
+      expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent(HOME_HEADING);
       expect(document.querySelector("img")).toBeNull();
     });
 
@@ -149,7 +148,7 @@ describe("/app is private (R7, R8, R10)", () => {
     stubSessionFetch(sessionOk);
     renderApp("/app");
 
-    expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent("Welcome, Ana");
+    expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent(HOME_HEADING);
   });
 });
 
@@ -164,7 +163,7 @@ describe("/auth/* for a signed-in user (R9)", () => {
       stubSessionFetch(sessionOk, sessionOk);
       const { router } = renderApp(path);
 
-      expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent("Welcome, Ana");
+      expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent(HOME_HEADING);
       expect(router.state.location.pathname).toBe("/app");
     },
   );

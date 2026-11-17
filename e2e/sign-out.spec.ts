@@ -32,7 +32,7 @@ test.describe("Sign out", () => {
     });
     await storeToken(page, token);
     await page.goto("/app");
-    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Welcome, Dora");
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Chat with the experts");
 
     const signOutRequest = page.waitForResponse((response) =>
       response.url().endsWith("/auth/sign-out"),
@@ -63,7 +63,7 @@ test.describe("Sign out", () => {
     await page.goto("/app");
 
     await expect(page).toHaveURL(/\/auth\/sign-in$/);
-    await expect(page.getByText(/Welcome/)).toHaveCount(0);
+    await expect(page.getByRole("heading", { level: 1, name: "Chat with the experts" })).toHaveCount(0);
     expect(consoleErrors.filter((text) => !text.includes("401"))).toEqual([]);
   });
 
@@ -79,7 +79,7 @@ test.describe("Sign out", () => {
       token,
     ] as [string, string]);
     await page.goto("/app");
-    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Welcome, Ana");
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Chat with the experts");
 
     await page.getByRole("button", { name: "Sign out" }).click();
     await expect(page).toHaveURL(/\/auth\/sign-in$/);
@@ -87,7 +87,7 @@ test.describe("Sign out", () => {
     await page.goBack();
 
     await expect(page).not.toHaveURL(/\/app/);
-    await expect(page.getByText(/Welcome/)).toHaveCount(0);
+    await expect(page.getByRole("heading", { level: 1, name: "Chat with the experts" })).toHaveCount(0);
     expect(await storedToken(page)).toBeNull();
   });
 
@@ -96,7 +96,7 @@ test.describe("Sign out", () => {
 
     await storeToken(page, token);
     await page.goto("/app");
-    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Welcome, Ana");
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Chat with the experts");
 
     await page.getByRole("button", { name: "Sign out" }).focus();
     await expect(page.getByRole("button", { name: "Sign out" })).toBeFocused();
@@ -110,7 +110,7 @@ test.describe("Sign out", () => {
 
     await storeToken(page, token);
     await page.goto("/app");
-    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Welcome, Ana");
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Chat with the experts");
 
     await page.route("**/auth/sign-out", (route) => route.abort("connectionrefused"));
     await page.getByRole("button", { name: "Sign out" }).click();

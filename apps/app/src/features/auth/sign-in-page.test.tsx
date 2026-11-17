@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "../../App";
 import { ACCESS_TOKEN_KEY } from "../../lib/access-token";
 import { createAppRouter } from "../../router";
+import { HOME_HEADING, withExpertsCatalog } from "../../test/render-app";
 
 const fetchMock = vi.fn();
 const originalFetch = globalThis.fetch;
@@ -64,7 +65,7 @@ async function fillForm(email = "ana@example.test", password = "correct horse ba
 const submitButton = () => screen.getByRole("button", { name: /^Sign(ing)? in/ });
 
 beforeEach(() => {
-  vi.stubGlobal("fetch", fetchMock);
+  vi.stubGlobal("fetch", withExpertsCatalog(fetchMock));
 });
 
 afterEach(() => {
@@ -163,7 +164,7 @@ describe("sign-in page", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("signs in: posts the credentials, stores the token and goes to /app showing the name without another call", async () => {
+  it("signs in: posts the credentials, stores the token and goes to /app and shows the home without another call", async () => {
     fetchMock.mockResolvedValueOnce(sessionOk());
 
     const { router } = renderSignIn();
@@ -171,7 +172,7 @@ describe("sign-in page", () => {
 
     await user.click(submitButton());
 
-    expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent("Welcome, Ana");
+    expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent(HOME_HEADING);
     expect(router.state.location.pathname).toBe("/app");
     expect(window.localStorage.getItem(ACCESS_TOKEN_KEY)).toBe(TOKEN);
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -204,7 +205,7 @@ describe("sign-in page", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
 
     release(sessionOk());
-    await screen.findByRole("heading", { level: 1, name: "Welcome, Ana" });
+    await screen.findByRole("heading", { level: 1, name: HOME_HEADING });
   });
 
   it("shows one general message for 401, clears the password, keeps the e-mail and focuses the password", async () => {
@@ -274,7 +275,7 @@ describe("sign-in page", () => {
     await user.type(screen.getByLabelText("Password"), "correct horse battery");
     await user.click(submitButton());
 
-    expect(await screen.findByRole("heading", { level: 1, name: "Welcome, Ana" })).toBeVisible();
+    expect(await screen.findByRole("heading", { level: 1, name: HOME_HEADING })).toBeVisible();
     await waitFor(() => expect(window.localStorage.getItem(ACCESS_TOKEN_KEY)).toBe(TOKEN));
   });
 

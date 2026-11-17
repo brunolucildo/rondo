@@ -21,6 +21,27 @@ interface Screen {
 
 const heading = (page: Page) => page.locator("h1").first().waitFor();
 
+const EXPERTS = [
+  {
+    id: "head-coach",
+    name: "Head Coach",
+    role: "Training, lineup and strategy decisions",
+    characterName: "Fictional Coach",
+    description: "A veteran coach who reads the game.",
+    suggestedQuestions: ["Which lineup do you suggest?", "How should the training week look?"],
+    notice: null,
+  },
+  {
+    id: "sports-lawyer",
+    name: "Sports Lawyer",
+    role: "Contracts, regulations and transfers",
+    characterName: "Fictional Lawyer",
+    description: "Points out contract risks.",
+    suggestedQuestions: ["Which clauses need attention?"],
+    notice: "Informational support only. It does not replace a licensed professional.",
+  },
+];
+
 const SCREENS: Screen[] = [
   { name: "sign-in", path: "/auth/sign-in", api: "none", ready: heading },
   {
@@ -45,7 +66,23 @@ const SCREENS: Screen[] = [
     ready: heading,
   },
   { name: "reset-password (no token)", path: "/auth/reset-password", api: "none", ready: heading },
-  { name: "home", path: "/app", api: "session", signedIn: true, ready: heading },
+  {
+    name: "home",
+    path: "/app",
+    api: "session",
+    signedIn: true,
+    ready: (page) => page.getByRole("combobox", { name: "Expert" }).waitFor(),
+  },
+  {
+    name: "home (expert with notice)",
+    path: "/app",
+    api: "session",
+    signedIn: true,
+    ready: async (page) => {
+      await page.getByRole("combobox", { name: "Expert" }).selectOption("sports-lawyer");
+      await page.getByText("Informational support only.").waitFor();
+    },
+  },
   { name: "not-found", path: "/does-not-exist", api: "none", ready: heading },
   {
     name: "session-error",
@@ -82,6 +119,15 @@ async function mockApi(page: Page, api: Api) {
 
     if (api === "session-down") {
       await route.abort("connectionrefused");
+      return;
+    }
+
+    if (api === "session" && route.request().url().endsWith("/experts")) {
+      await route.fulfill({
+        status: 200,
+        headers: { ...cors, "content-type": "application/json" },
+        body: JSON.stringify({ experts: EXPERTS }),
+      });
       return;
     }
 

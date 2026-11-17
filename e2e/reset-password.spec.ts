@@ -244,7 +244,7 @@ test.describe("reset password flow", () => {
     await page.getByLabel("Password", { exact: true }).fill(NEW_PASSWORD);
     await page.getByRole("button", { name: "Sign in" }).click();
     await expect(page).toHaveURL(`${APP_URL}/app`);
-    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Welcome, Dora");
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Chat with the experts");
 
     // The same link again (in a clean browser) is refused.
     const other = await browser.newContext({ baseURL: APP_URL });

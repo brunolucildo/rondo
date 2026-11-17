@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ACCESS_TOKEN_KEY } from "../../lib/access-token";
 import {
+  HOME_HEADING,
   jsonResponse,
   renderApp,
   SESSION_USER,
@@ -22,7 +23,7 @@ const networkFailure = () => Promise.reject(new TypeError("Failed to fetch")) as
 async function openHome() {
   const result = renderApp("/app");
 
-  await screen.findByRole("heading", { level: 1, name: "Welcome, Ana" });
+  await screen.findByRole("heading", { level: 1, name: HOME_HEADING });
 
   return result;
 }
@@ -79,7 +80,7 @@ describe("the Sign out button on the home (R3)", () => {
         .getAll()
         .filter((query) => query.state.data !== undefined),
     ).toHaveLength(0);
-    expect(screen.queryByText(/Welcome/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { level: 1, name: HOME_HEADING })).not.toBeInTheDocument();
   });
 
   it.each([
@@ -152,7 +153,7 @@ describe("signing out when the API fails (R4)", () => {
         .getAll()
         .filter((query) => query.state.data !== undefined),
     ).toHaveLength(0);
-    expect(screen.queryByText(/Welcome/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { level: 1, name: HOME_HEADING })).not.toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 

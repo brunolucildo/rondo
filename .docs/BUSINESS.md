@@ -38,6 +38,8 @@ Exemplos de configuração, não requisitos fechados:
 | **Jurídico Esportivo Expert**     | Apoiar contratos, regulamentos e transferências             | Contratos, regulamentos de federação, normas da FIFA/CBF      | Resumo de riscos, checklist contratual, parecer                    |
 | **Fisiologista Expert**           | Apoiar controle de carga, recuperação e prevenção de lesões | Dados físicos, carga de treino, histórico de lesões           | Recomendações de recuperação, alertas de sobrecarga                |
 
+**Implementado na spec `0019` (home de chat).** O catálogo tem 7 experts fixos, definidos em código: Head Coach, Performance Analyst, Sports Lawyer, Physiologist, Sports Physician, Physiotherapist e Football Manager. Cada um tem um **personagem fictício** (nenhum é pessoa real; o Head Coach é inspirado só no estilo de um técnico veterano, sem nome, imagem ou frase de alguém real), escopo e limite explícitos e perguntas sugeridas em pt-BR. A resposta vem em streaming, no idioma da mensagem, sem citações e sem fontes (chegam nas specs `0022` a `0024`); a conversa só existe na página (histórico persistente: `0020`). Os experts de saúde e jurídico (`sports-lawyer`, `physiologist`, `sports-physician`, `physiotherapist`) mostram o aviso fixo "Informational support only. It does not replace a licensed professional." e orientam a procurar um profissional quando a pergunta exige avaliação individual. Premissas pendentes de aprovação: nomes dos personagens, perguntas sugeridas (Produto) e o texto do aviso (Jurídico).
+
 ## 5. Conectores previstos
 
 | Categoria              | Conectores                      |
@@ -102,7 +104,7 @@ Estas decisões afetam diretamente o modelo de dados e a arquitetura. Não as as
 
 1. **Multi-tenant:** o isolamento é por clube, por usuário ou por workspace? RLS é obrigatória?
 2. **Autenticação:** decidida: identidade própria na API (ADR `0007`), com Argon2id no lugar do `bcrypt` do stack original e sessão por JWT com `sid` no banco (ADR `0009`). Fica em aberto só um provedor externo (SSO) para clubes que o exijam.
-3. **LLM:** provedor único, multi-provedor ou chave trazida pelo cliente (BYOK)?
+3. **LLM:** provisório na spec `0019`: provedor único (OpenAI, `gpt-4o-mini`), chave só no servidor, limite por IP; multi-provedor, BYOK e limite por usuário seguem em aberto.
 4. **Ingestão:** sincronização contínua, agendada ou sob demanda? Quem paga o custo de indexação?
 5. **Permissões:** um expert pode acessar qualquer fonte do clube ou apenas as explicitamente vinculadas?
 6. **Retenção e LGPD:** por quanto tempo documentos e conversas ficam armazenados? Como atender exclusão?

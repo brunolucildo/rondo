@@ -5,7 +5,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { SessionError, SessionLoading } from "./features/auth/session-states";
 import { ACCESS_TOKEN_KEY } from "./lib/access-token";
-import { jsonResponse, renderApp, SESSION_USER, stubSessionFetch } from "./test/render-app";
+import { HOME_HEADING, jsonResponse, renderApp, SESSION_USER, stubSessionFetch } from "./test/render-app";
 
 const ROOT = `${resolve(process.cwd(), "../..")}/`;
 const readRepoFile = (path: string) => readFileSync(`${ROOT}${path}`, "utf8");
@@ -135,7 +135,7 @@ describe("Rondo logo on the screens", () => {
     stubSessionFetch(() => jsonResponse(200, { user: SESSION_USER }));
     renderApp("/app");
 
-    expect(await screen.findByRole("heading", { level: 1, name: /Welcome/ })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { level: 1, name: HOME_HEADING })).toBeInTheDocument();
     // One brand per screen: the shell header has the wordmark, so the body has no compact mark.
     expect(screen.getByRole("img", { name: "Rondo" })).toBeInTheDocument();
     expect(decorativeMarks()).toHaveLength(0);

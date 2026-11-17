@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@langchain/core": "1.4.1",
+    "@langchain/langgraph": "1.7.5",
     "@langchain/openai": "1.8.4",
     "@langchain/weaviate": "1.1.0",
     "@nestjs/common": "^12.4.0",

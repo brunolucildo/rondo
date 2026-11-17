@@ -30,5 +30,5 @@ test("shows the not-found page for /app/does-not-exist when signed in", async ({
   await page.getByRole("link", { name: "Go to the home page" }).click();
 
   await expect(page).toHaveURL(/\/app$/);
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Welcome, Ana");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Chat with the experts");
 });

@@ -5,6 +5,7 @@ import { HealthController } from "./health/health.controller";
 import { RateLimitModule } from "./modules/rate-limit";
 import { EmailModule } from "./modules/email";
 import { AuthModule } from "./modules/auth";
+import { ExpertsModule } from "./modules/experts";
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { AuthModule } from "./modules/auth";
     RateLimitModule,
     EmailModule,
     AuthModule,
+    ExpertsModule,
   ],
   controllers: [HealthController],
 })

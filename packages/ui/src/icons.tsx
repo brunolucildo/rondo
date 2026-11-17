@@ -226,3 +226,12 @@ export const BallIcon = drawIcon([
   "..KKPPPPPPKK..",
   "....KKKKKK....",
 ]);
+
+/** Chevron pointing down (10 x 5): opens a dropdown. */
+export const ChevronDownIcon = drawIcon([
+  "KK......KK",
+  ".KK....KK.",
+  "..KK..KK..",
+  "...KKKK...",
+  "....KK....",
+]);

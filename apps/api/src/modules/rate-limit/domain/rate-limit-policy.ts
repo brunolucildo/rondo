@@ -22,6 +22,8 @@ export const AUTH_RATE_LIMIT_POLICIES = {
   "resend-confirmation": { limit: 3, windowSeconds: 10 * 60, keyBy: "ip-and-email" },
   "forgot-password": { limit: 3, windowSeconds: 10 * 60, keyBy: "ip-and-email" },
   "reset-password": { limit: 10, windowSeconds: 10 * 60, keyBy: "ip" },
+  // Per IP, not per user: the limiter runs before authentication and cannot see the session.
+  "expert-message": { limit: 20, windowSeconds: 60, keyBy: "ip" },
 } as const satisfies Record<string, RateLimitPolicy>;
 
 export type RateLimitPolicies = Readonly<Record<string, RateLimitPolicy>>;
