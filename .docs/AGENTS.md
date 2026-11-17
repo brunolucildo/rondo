@@ -43,8 +43,11 @@ Execute na raiz. Requer **Bun 1.4.4** e **Node.js >= 24**. Docker e `.env` só s
 | subir / derrubar infra local    | `bun run infra:up` / `bun run infra:down`    |
 | aplicar migrations locais       | `bun run db:migrate`                         |
 | instalar hooks (requer git)     | `bun run hooks:install`                      |
+| gerar os avatares dos experts   | `bun run experts:avatars -- --expert <id>`   |
 
 Portas: `apps/app` → **5173**; `apps/docs` → **3001**; `apps/api` → **3002**; Grafana → **3000**. Lista completa em `ARCHITECTURE.md` §2.1.
+
+`experts:avatars` é manual e roda uma vez por expert: sem flag imprime a ajuda e não chama a rede; exige `OPENAI_API_KEY` (modelo `gpt-image-2`, trocável por `OPENAI_IMAGE_MODEL`); `--all` faz 7 chamadas à Image API (confira o preço vigente na OpenAI) e `--force` regenera arquivos existentes. Nunca roda em CI nem no servidor. Detalhes em `DESIGN.md` §12.
 
 **Não existem** (não invente): `bun codes:fix`, `bun run web`, scripts de ESLint ou Prettier. A primeira execução do E2E exige `bunx playwright install`.
 
@@ -111,6 +114,7 @@ apps/app                    # cliente de produto (React + Vite) — porta 5173
 apps/api                    # API (Nest.js) — porta 3002
 apps/docs                   # site de documentação (Next.js 16) — porta 3001
 packages/ui                 # design system compartilhado (@repo/ui)
+packages/experts-avatars      # ferramenta de dev dos avatares pixel art (@repo/experts-avatars)
 packages/typescript-config  # tsconfig base compartilhado
 db/                         # Postgres local: migrations/ (SQL) e init/ (roles)
 infra/                      # configs de Grafana, Loki, Tempo, Mimir e OTel Collector

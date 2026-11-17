@@ -3,7 +3,7 @@
 > Spec executável. Preencha todas as seções; `TODO` é lacuna, não requisito.
 > Use `create-spec` para criar, `refine-spec` para auditar e `implement-me` para executar.
 
-- **Status:** pronta
+- **Status:** em implementação (pendente: geração real e aprovação dos 7 PNGs; ver plano)
 - **Slug:** 0021-experts-avatars-pixel-art
 - **Data:** 2026-11-17
 - **Atualizado em:** 2026-11-17
@@ -126,6 +126,9 @@ Como validar que a spec foi atendida:
 | **Premissa (compartilhada):** `gpt-image-2` serve só para os avatares, uma vez; geração de imagem ou vídeo no chat fica no backlog.                | Escopo do uso de `gpt-image-2` e `gemini-omni-flash`. | Não         | Produto         |
 | **Premissa:** PNG de 96×96 a 192×192 px, até 32 cores, até 20 KB cada, servido como asset do app.                                                   | Qualidade e peso.                                | Não         | Design          |
 | **Premissa:** os experts têm personagens fictícios e a aprovação final da arte é do Produto/Design.                                                | Calendário do release.                           | Não         | Produto/Design  |
+| **Premissa (execução 2026-11-17):** os prompts são em inglês (o modelo responde melhor) e pedem "pixel art, 8-bit, no text", o equivalente de "sem texto" de R3; o tamanho pedido à API é `1024x1024` (`OPENAI_IMAGE_SIZE`) e o arquivo final tem 144 px (grade de 48 px, 3x), com até 16 cores mais a transparência do fundo. | Qualidade e peso. | Não | Eng. |
+| **Premissa (execução 2026-11-17):** a ferramenta é o workspace `packages/experts-avatars` (com `lint`, tipos e testes no Turborepo) e `scripts/experts-avatars.ts` só a chama; o "dropdown" é um `<select>` nativo, então o avatar do expert escolhido aparece ao lado do campo. | Estrutura e UI. | Não | Eng. |
+| **Premissa (execução 2026-11-17):** sem `OPENAI_API_KEY` na execução orquestrada, os 7 PNGs não foram gerados; a completude é um teste opt-in (`REQUIRE_ALL_AVATARS=1`) a ligar depois da geração e da aprovação. | R1, R5 e R7 ficam pendentes. | Não | Produto/Design |
 | Pergunta: os termos de uso da OpenAI para imagens geradas exigem alguma atribuição no produto?                                                     | Texto no produto ou na documentação.             | Não         | Jurídico        |
 | **Premissa:** o avatar é resolvido no app pelo `id` do expert; a API não devolve avatar (decisão de 2026-11-17, refinamento da 0019 e da 0021). | Contrato de `GET /experts` (0019 R1) e requisito R5. | Não | Eng. |
 
@@ -135,3 +138,4 @@ Como validar que a spec foi atendida:
 | ---------- | ---------------------- | ----------------------------------------------- |
 | 2026-11-17 | Spec criada (rascunho) | Quebra do épico de experts (`breakdown-specs`). |
 | 2026-11-17 | R5, critérios de aceite e passo 5 reescritos: o app mapeia `id` → PNG e a API não devolve avatar; passo 3 pede justificar a biblioteca de imagem | Incoerência de arquitetura: os assets são do app Vite (nome com hash) e a API não conhece os nomes; alinhado ao ajuste de R1 da 0019 |
+| 2026-11-17 | Premissas de execução: ferramenta em workspace, prompts em inglês, avatar ao lado do seletor, geração real pendente | `implement-me` sem chave da OpenAI |

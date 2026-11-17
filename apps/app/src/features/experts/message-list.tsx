@@ -40,7 +40,7 @@ function ExpertBubble({
 
   return (
     <div className="flex items-start gap-3">
-      <ExpertAvatar expertId={expert.id} className="size-10" />
+      <ExpertAvatar expertId={expert.id} className="size-12" />
       <div className="max-w-[85%] min-w-0 space-y-2">
         <p className="text-sm font-bold">
           <span className="sr-only">Answer from </span>

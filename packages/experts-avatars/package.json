@@ -1,0 +1,22 @@
+{
+  "name": "@repo/experts-avatars",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "lint": "oxlint src --deny-warnings",
+    "check-types": "tsc --noEmit",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage"
+  },
+  "dependencies": {
+    "pngjs": "^7.0.0"
+  },
+  "devDependencies": {
+    "@repo/typescript-config": "*",
+    "@types/node": "^26.4.1",
+    "@types/pngjs": "^6.0.5",
+    "typescript": "^6.0.3",
+    "vitest": "^5.1.0"
+  }
+}
