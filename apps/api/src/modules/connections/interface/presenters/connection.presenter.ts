@@ -41,3 +41,11 @@ export function presentUpload(
 ): UploadConnectionResponse {
   return { ...presentConnection(connection), deduplicated };
 }
+
+export interface ConnectionListResponse {
+  connections: ConnectionResponse[];
+}
+
+export function presentConnectionList(connections: readonly Connection[]): ConnectionListResponse {
+  return { connections: connections.map(presentConnection) };
+}

@@ -69,6 +69,18 @@ export interface ConnectionSources {
   hasReadyConnection(userId: string): Promise<boolean>;
 }
 
+/**
+ * Which cited connections still exist (spec 0025). A citation whose connection was deleted is
+ * shown as "Source removed", without its stored name. Scoped to the user of the session.
+ */
+export interface CitationSources {
+  /** The ids, among `connectionIds`, that are still connections of the user. */
+  existingConnectionIds(
+    userId: string,
+    connectionIds: readonly string[],
+  ): Promise<ReadonlySet<string>>;
+}
+
 /** The events a request handler turns into the response stream. */
 export type ExpertAnswerEvent =
   | { type: "text"; text: string }

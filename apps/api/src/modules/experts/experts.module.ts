@@ -23,12 +23,14 @@ import { SendExpertMessage } from "./application/use-cases/send-expert-message.u
 import type { ConversationLock, ConversationRepository } from "./domain/conversation-ports";
 import type { ExpertChatConfig } from "./domain/expert-chat-config";
 import type {
+  CitationSources,
   ConnectionSources,
   ExpertOrchestrator,
   KnowledgeRetriever,
 } from "./domain/expert-ports";
 import type { ExpertRetrievalConfig } from "./domain/expert-retrieval-config";
 import {
+  CITATION_SOURCES,
   CONNECTION_SOURCES,
   CONVERSATION_DATABASE,
   CONVERSATION_LOCK,
@@ -42,6 +44,7 @@ import { createExpertOrchestrator } from "./infrastructure/create-expert-orchest
 import { InMemoryConversationLock } from "./infrastructure/in-memory-conversation-lock";
 import { KnowledgeIndexRetriever } from "./infrastructure/knowledge-index-retriever";
 import { PostgresConversationRepository } from "./infrastructure/postgres-conversation.repository";
+import { RepositoryCitationSources } from "./infrastructure/repository-citation-sources";
 import { RepositoryConnectionSources } from "./infrastructure/repository-connection-sources";
 import { ClearConversationRequestHandler } from "./interface/request-handlers/clear-conversation.request-handler";
 import { GetConversationRequestHandler } from "./interface/request-handlers/get-conversation.request-handler";
@@ -87,6 +90,12 @@ import { SendExpertMessageRequestHandler } from "./interface/request-handlers/se
         new RepositoryConnectionSources(connections),
     },
     {
+      provide: CITATION_SOURCES,
+      inject: [CONNECTION_REPOSITORY],
+      useFactory: (connections: ConnectionRepository): CitationSources =>
+        new RepositoryCitationSources(connections),
+    },
+    {
       // The only place that picks the model: OpenAI, the scripted fake (NODE_ENV=test) or none.
       provide: EXPERT_ORCHESTRATOR,
       inject: [EXPERT_CHAT_CONFIG, KNOWLEDGE_RETRIEVER],
@@ -121,8 +130,9 @@ import { SendExpertMessageRequestHandler } from "./interface/request-handlers/se
     },
     {
       provide: GetConversation,
-      inject: [CONVERSATION_REPOSITORY],
-      useFactory: (conversations: ConversationRepository) => new GetConversation(conversations),
+      inject: [CONVERSATION_REPOSITORY, CITATION_SOURCES],
+      useFactory: (conversations: ConversationRepository, sources: CitationSources) =>
+        new GetConversation(conversations, sources),
     },
     {
       provide: ClearConversation,

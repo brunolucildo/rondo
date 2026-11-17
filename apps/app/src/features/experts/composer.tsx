@@ -6,6 +6,7 @@ import { Textarea } from "@repo/ui/textarea";
 import { type FormEvent, type KeyboardEvent, useId, useLayoutEffect, useRef } from "react";
 import { AddConnectionButton } from "../connections/add-connection-button";
 import { AttachmentChips } from "../connections/attachment-chips";
+import { ConnectionsButton } from "../connections/connections-button";
 import { useAttachments } from "../connections/use-attachments";
 import { MESSAGE_LIMIT } from "./chat-state";
 import { ExpertAvatar } from "./expert-avatar";
@@ -95,7 +96,10 @@ export function Composer({
 
   return (
     <div className="sticky bottom-0 z-10 border-t-2 border-border bg-card pb-[env(safe-area-inset-bottom)]">
-      <AddConnectionButton className="absolute -top-14 right-4" />
+      <div className="absolute -top-14 right-4 flex gap-2">
+        <ConnectionsButton />
+        <AddConnectionButton />
+      </div>
       <form
         aria-label="Send a message"
         onSubmit={handleSubmit}

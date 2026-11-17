@@ -7,9 +7,12 @@ import { GetConversation } from "./get-conversation.use-case";
 const USER = "11111111-1111-4111-8111-111111111111";
 const OTHER = "22222222-2222-4222-8222-222222222222";
 
+/** No cited connection exists: only used by tests that have no citations. */
+const NO_SOURCES = { existingConnectionIds: () => Promise.resolve(new Set<string>()) };
+
 describe("GetConversation (R2, R3)", () => {
   it("returns an empty list when there is no conversation", async () => {
-    const useCase = new GetConversation(new InMemoryConversationRepository());
+    const useCase = new GetConversation(new InMemoryConversationRepository(), NO_SOURCES);
 
     await expect(useCase.execute({ userId: USER, expertId: "head-coach" })).resolves.toEqual({
       messages: [],
@@ -19,7 +22,7 @@ describe("GetConversation (R2, R3)", () => {
 
   it("returns the 50 newest of 120 messages in chronological order, and the 50 before them by cursor", async () => {
     const conversations = new InMemoryConversationRepository();
-    const useCase = new GetConversation(conversations);
+    const useCase = new GetConversation(conversations, NO_SOURCES);
 
     conversations.seed(USER, "head-coach", 120);
 
@@ -54,7 +57,7 @@ describe("GetConversation (R2, R3)", () => {
 
     conversations.seed(USER, "head-coach", 10);
 
-    const page = await new GetConversation(conversations).execute({
+    const page = await new GetConversation(conversations, NO_SOURCES).execute({
       userId: USER,
       expertId: "head-coach",
       limit: 3,
@@ -72,7 +75,7 @@ describe("GetConversation (R2, R3)", () => {
 
     conversations.seed(OTHER, "head-coach", 4);
 
-    const page = await new GetConversation(conversations).execute({
+    const page = await new GetConversation(conversations, NO_SOURCES).execute({
       userId: USER,
       expertId: "head-coach",
     });
@@ -81,7 +84,7 @@ describe("GetConversation (R2, R3)", () => {
   });
 
   it("throws ExpertNotFoundError for an unknown expert and InvalidCursorError for a forged cursor", async () => {
-    const useCase = new GetConversation(new InMemoryConversationRepository());
+    const useCase = new GetConversation(new InMemoryConversationRepository(), NO_SOURCES);
 
     await expect(useCase.execute({ userId: USER, expertId: "nobody" })).rejects.toThrow(
       ExpertNotFoundError,
@@ -125,5 +128,84 @@ describe("ClearConversation (R7)", () => {
     await expect(useCase.execute({ userId: USER, expertId: "nobody" })).rejects.toThrow(
       ExpertNotFoundError,
     );
+  });
+});
+
+describe("GetConversation citations (spec 0025, R7)", () => {
+  const KEPT = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+  const GONE = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+  const citation = (connectionId: string, sourceName: string, page: number | null = null) => ({
+    connectionId,
+    sourceName,
+    page,
+    position: 0,
+  });
+
+  async function seeded() {
+    const conversations = new InMemoryConversationRepository();
+
+    await conversations.append(USER, "head-coach", {
+      role: "assistant",
+      content: "An answer.",
+      status: "complete",
+      citations: [citation(KEPT, "kept.pdf", 2), citation(GONE, "SENTINEL-gone.pdf", 1)],
+    });
+    await conversations.append(USER, "head-coach", {
+      role: "assistant",
+      content: "Another.",
+      status: "complete",
+      citations: [],
+    });
+    await conversations.append(USER, "head-coach", {
+      role: "user",
+      content: "A question.",
+      status: "complete",
+    });
+
+    return conversations;
+  }
+
+  it("shows a citation of a deleted connection as removed, without its name, and keeps the others", async () => {
+    const calls: string[][] = [];
+    const sources = {
+      existingConnectionIds: (_userId: string, ids: readonly string[]) => {
+        calls.push([...ids]);
+
+        return Promise.resolve(new Set([KEPT]));
+      },
+    };
+    const page = await new GetConversation(await seeded(), sources).execute({
+      userId: USER,
+      expertId: "head-coach",
+    });
+
+    expect(page.messages.map((message) => message.citations)).toEqual([
+      [
+        { ...citation(KEPT, "kept.pdf", 2), removed: false },
+        { connectionId: GONE, removed: true },
+      ],
+      [],
+      null,
+    ]);
+    expect(JSON.stringify(page)).not.toContain("SENTINEL-gone.pdf");
+    expect(page.messages[0]?.content).toBe("An answer.");
+    expect(calls).toEqual([[KEPT, GONE]]);
+  });
+
+  it("does not ask for connections when no message cites a source", async () => {
+    const conversations = new InMemoryConversationRepository();
+    let asked = false;
+
+    conversations.seed(USER, "head-coach", 3);
+
+    await new GetConversation(conversations, {
+      existingConnectionIds: () => {
+        asked = true;
+
+        return Promise.resolve(new Set<string>());
+      },
+    }).execute({ userId: USER, expertId: "head-coach" });
+
+    expect(asked).toBe(false);
   });
 });

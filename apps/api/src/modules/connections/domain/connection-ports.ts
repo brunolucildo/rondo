@@ -36,6 +36,19 @@ export interface ConnectionRepository {
   ): Promise<Connection | null>;
   markReady(userId: string, connectionId: string, chunkCount: number): Promise<void>;
   markFailed(userId: string, connectionId: string, errorCode: ConnectionErrorCode): Promise<void>;
+  /** Every connection of the user, the most recent first. */
+  listByUser(userId: string): Promise<Connection[]>;
+  /** True when the user has a connection being processed that is not stale (`updatedAt >= staleBefore`). */
+  hasActiveProcessing(userId: string, staleBefore: Date): Promise<boolean>;
+  /**
+   * Deletes the row of one connection of the user unless it is being processed right now (not
+   * stale). Returns whether a row was deleted. The deduplication identity goes with the row.
+   */
+  deleteSettled(userId: string, connectionId: string, staleBefore: Date): Promise<boolean>;
+  /** Deletes every row of the user except the ones being processed right now. Returns the count. */
+  deleteAllSettled(userId: string, staleBefore: Date): Promise<number>;
+  /** The ids, among `connectionIds`, that are still connections of the user. */
+  findExistingIds(userId: string, connectionIds: readonly string[]): Promise<string[]>;
 }
 
 /** One piece of extracted text, with its page when the source has pages (one-based). */
@@ -71,6 +84,17 @@ export interface IngestionResult {
   chunkCount: number;
 }
 
+/** `single`: one connection; `all`: every connection of the user. */
+export type DeletionScope = "single" | "all";
+
+/** Closed set of what a deletion request came to. */
+export type DeletionOutcome =
+  | "success"
+  | "not_found"
+  | "processing"
+  | "index_unavailable"
+  | "error";
+
 export interface ConnectionTelemetry {
   /** Runs one processing inside a span and records the counter, the duration and the log. */
   traceIngestion(
@@ -79,4 +103,6 @@ export interface ConnectionTelemetry {
   ): Promise<IngestionResult>;
   /** A dedup answer: the content was already connected, nothing was processed. */
   recordDeduplicated(kind: ConnectionKind, durationSeconds: number): void;
+  /** One deletion request: scope, outcome and duration only, never a name, id or content. */
+  recordDeletion(scope: DeletionScope, outcome: DeletionOutcome, durationSeconds: number): void;
 }

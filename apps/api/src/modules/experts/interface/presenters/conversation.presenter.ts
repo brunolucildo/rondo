@@ -1,5 +1,8 @@
-import type { MessagePage, StoredMessage } from "../../domain/conversation-ports";
-import type { Citation } from "../../domain/grounding";
+import type {
+  ResolvedCitation,
+  ResolvedMessage,
+  ResolvedMessagePage,
+} from "../../domain/conversation-ports";
 
 export interface ConversationMessageResponse {
   id: string;
@@ -7,7 +10,7 @@ export interface ConversationMessageResponse {
   content: string;
   status: "complete" | "incomplete";
   /** `null`: no retrieval ran; `[]`: no connected source covers the question. */
-  citations: Citation[] | null;
+  citations: ResolvedCitation[] | null;
   createdAt: string;
 }
 
@@ -16,7 +19,7 @@ export interface ConversationResponse {
   nextCursor: string | null;
 }
 
-export function presentMessage(message: StoredMessage): ConversationMessageResponse {
+export function presentMessage(message: ResolvedMessage): ConversationMessageResponse {
   return {
     id: message.id,
     role: message.role,
@@ -27,6 +30,6 @@ export function presentMessage(message: StoredMessage): ConversationMessageRespo
   };
 }
 
-export function presentConversation(page: MessagePage): ConversationResponse {
+export function presentConversation(page: ResolvedMessagePage): ConversationResponse {
   return { messages: page.messages.map(presentMessage), nextCursor: page.nextCursor };
 }

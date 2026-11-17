@@ -24,6 +24,22 @@ export class ConnectionNotFoundError extends Error {
   }
 }
 
+/** A connection (or one of them, on "delete all") is still being processed: it cannot be deleted yet. */
+export class ConnectionBusyError extends Error {
+  constructor() {
+    super("Connection is still processing.");
+    this.name = "ConnectionBusyError";
+  }
+}
+
+/** The vector index could not remove the vectors: nothing else was deleted, trying again is safe. */
+export class ConnectionIndexUnavailableError extends Error {
+  constructor() {
+    super("The knowledge index is unavailable.");
+    this.name = "ConnectionIndexUnavailableError";
+  }
+}
+
 /** Extraction or chunking ended with a reason the user can act on. Fixed message. */
 export class ConnectionProcessingError extends Error {
   constructor(readonly code: ConnectionErrorCode) {

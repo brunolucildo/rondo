@@ -99,3 +99,61 @@ export function checkFileBeforeUpload(file: File): FailureMessage | null {
 
   return null;
 }
+
+export type DeletionScope = "single" | "all";
+
+/**
+ * What to tell the person when a deletion fails, by the code the API gave. `reload` means the
+ * list is out of date (the connection is already gone) and must be fetched again.
+ */
+export function describeDeleteFailure(
+  error: unknown,
+  scope: DeletionScope,
+): { text: string; reload: boolean } {
+  if (error instanceof ApiError) {
+    if (error.code === "CONNECTION_PROCESSING") {
+      return { text: "Wait for it to finish.", reload: false };
+    }
+
+    if (error.code === "CONNECTION_NOT_FOUND") {
+      return { text: "This connection was already removed.", reload: true };
+    }
+  }
+
+  return {
+    text:
+      scope === "single"
+        ? "We couldn't delete this connection. Try again."
+        : "We couldn't delete your connections. Try again.",
+    reload: false,
+  };
+}
+
+const KIND_LABEL: Record<ConnectionDto["kind"], string> = {
+  pdf: "PDF",
+  txt: "TXT",
+  md: "Markdown",
+};
+
+export const kindLabel = (kind: ConnectionDto["kind"]): string => KIND_LABEL[kind];
+
+/** "1.2 MB", "34 KB", "512 B": what the list shows for the size of a file. */
+export function formatSize(bytes: number): string {
+  if (bytes < 1024) {
+    return `${bytes} B`;
+  }
+
+  if (bytes < 1024 * 1024) {
+    return `${Math.round(bytes / 1024)} KB`;
+  }
+
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+const STATUS_TEXT: Record<ConnectionStatus, string> = {
+  processing: "Processing",
+  ready: "Ready",
+  failed: "Failed",
+};
+
+export const statusLabel = (status: ConnectionStatus): string => STATUS_TEXT[status];
