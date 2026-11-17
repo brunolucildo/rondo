@@ -5,6 +5,7 @@ import { Spinner } from "@repo/ui/spinner";
 import { Textarea } from "@repo/ui/textarea";
 import { type FormEvent, type KeyboardEvent, useId, useLayoutEffect, useRef } from "react";
 import { MESSAGE_LIMIT } from "./chat-state";
+import { ExpertAvatar } from "./expert-avatar";
 import type { Expert } from "./use-experts";
 
 const MAX_TEXTAREA_HEIGHT_PX = 160;
@@ -92,17 +93,22 @@ export function Composer({
           <Label htmlFor={selectId} className="text-sm">
             Expert
           </Label>
-          <Select
-            id={selectId}
-            value={expert.id}
-            onChange={(event) => onSelectExpert(event.target.value)}
-          >
-            {experts.map((option) => (
-              <option key={option.id} value={option.id}>
-                {option.name} - {option.role}
-              </option>
-            ))}
-          </Select>
+          <div className="flex items-center gap-3">
+            <ExpertAvatar expertId={expert.id} className="size-12" />
+            <div className="min-w-0 flex-1">
+              <Select
+                id={selectId}
+                value={expert.id}
+                onChange={(event) => onSelectExpert(event.target.value)}
+              >
+                {experts.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.name} - {option.role}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          </div>
         </div>
         <div className="flex items-end gap-3">
           <div className="min-w-0 flex-1 space-y-1">

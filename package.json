@@ -22,6 +22,7 @@
     "infra:down": "bun run scripts/infra-down.ts",
     "infra:reset": "bun run scripts/infra-reset.ts",
     "db:migrate": "bun run scripts/db-migrate.ts",
+    "experts:avatars": "bun run scripts/experts-avatars.ts",
     "hooks:install": "lefthook install"
   },
   "devDependencies": {

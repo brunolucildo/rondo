@@ -19,6 +19,12 @@ describe("presentExpert (R1)", () => {
     ]);
   });
 
+  it("carries no avatar: the app resolves the picture by id (spec 0021)", () => {
+    for (const expert of EXPERTS) {
+      expect(presentExpert(expert)).not.toHaveProperty("avatar");
+    }
+  });
+
   it("never leaks the persona, the limits or the system prompt", () => {
     for (const expert of EXPERTS) {
       const json = JSON.stringify(presentExpert(expert));
