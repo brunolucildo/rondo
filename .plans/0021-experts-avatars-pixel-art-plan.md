@@ -1,6 +1,6 @@
 # Plano — Avatares 8-bit dos experts
 
-- **Status:** em implementação (pendente: geração real dos 7 PNGs com `gpt-image-2`, sem `OPENAI_API_KEY` na execução orquestrada; aprovação do Produto/Design)
+- **Status:** concluída (avatares gerados e aprovados em 2026-11-17)
 - **Slug:** 0021-experts-avatars-pixel-art
 - **Spec:** `.specs/0021-experts-avatars-pixel-art.md`
 - **Data:** 2026-11-17
