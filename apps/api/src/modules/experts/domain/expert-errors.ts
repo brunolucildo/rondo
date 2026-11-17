@@ -23,3 +23,27 @@ export class ExpertModelError extends Error {
     this.name = "ExpertModelError";
   }
 }
+
+/** Another answer of the same user with the same expert is still being generated. */
+export class ConversationBusyError extends Error {
+  constructor() {
+    super("This expert is still answering.");
+    this.name = "ConversationBusyError";
+  }
+}
+
+/** The `before` cursor is not one this server produced. */
+export class InvalidCursorError extends Error {
+  constructor() {
+    super("The cursor is invalid.");
+    this.name = "InvalidCursorError";
+  }
+}
+
+/** A failed read or write of the conversation. The message never carries data. */
+export class ConversationStorageError extends Error {
+  constructor(readonly operation: string) {
+    super(`Conversation storage failed: ${operation}.`);
+    this.name = "ConversationStorageError";
+  }
+}

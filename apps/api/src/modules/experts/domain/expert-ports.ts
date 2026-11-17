@@ -32,5 +32,5 @@ export interface ExpertOrchestrator {
 export type ExpertAnswerEvent =
   | { type: "text"; text: string }
   | { type: "done"; usage: TokenUsage | null }
-  | { type: "failed"; reason: "provider_error" | "timeout" }
+  | { type: "failed"; reason: "provider_error" | "timeout" | "storage_error" }
   | { type: "aborted" };

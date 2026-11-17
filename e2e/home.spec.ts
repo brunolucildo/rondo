@@ -21,7 +21,16 @@ test("redirects / to /app and renders the home without console errors when signe
     }
   });
   page.on("requestfailed", (request) => {
-    failedRequests.push(request.url());
+    // The read of the stored conversation is cancelled on purpose when its screen unmounts (React
+    // StrictMode mounts twice in development); that abort is not a failed request.
+    if (
+      !(
+        request.url().endsWith("/conversation") &&
+        request.failure()?.errorText === "net::ERR_ABORTED"
+      )
+    ) {
+      failedRequests.push(request.url());
+    }
   });
   await page.addInitScript(
     ([key, value]) => window.localStorage.setItem(key as string, value as string),

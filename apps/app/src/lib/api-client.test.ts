@@ -25,6 +25,40 @@ describe("api client", () => {
     });
   });
 
+  it("passes the abort signal of a GET to fetch, and leaves it out when there is none", async () => {
+    const fetcher = vi.fn().mockResolvedValue(jsonResponse(200, { ok: true }));
+    const client = createApiClient({ baseUrl: "http://api.test/api/v1", fetch: fetcher });
+    const controller = new AbortController();
+
+    await client.get("/a", { signal: controller.signal });
+    await client.get("/b");
+
+    expect(fetcher.mock.calls[0]?.[1]).toMatchObject({ method: "GET", signal: controller.signal });
+    expect(fetcher.mock.calls[1]?.[1]).not.toHaveProperty("signal");
+  });
+
+  it("deletes and resolves undefined on 204, and raises the typed error on failure", async () => {
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(
+        jsonResponse(404, {
+          error: { code: "EXPERT_NOT_FOUND", message: "Expert not found.", details: [] },
+        }),
+      );
+    const client = createApiClient({ baseUrl: "http://api.test/api/v1", fetch: fetcher });
+
+    await expect(client.delete("/experts/head-coach/conversation")).resolves.toBeUndefined();
+    expect(fetcher).toHaveBeenCalledWith("http://api.test/api/v1/experts/head-coach/conversation", {
+      method: "DELETE",
+      headers: { accept: "application/json" },
+    });
+    await expect(client.delete("/experts/nobody/conversation")).rejects.toMatchObject({
+      status: 404,
+      code: "EXPERT_NOT_FOUND",
+    });
+  });
+
   it("turns the error envelope into a typed ApiError", async () => {
     const details = [{ field: "email", message: "Enter a valid email address." }];
     const fetcher = vi.fn().mockResolvedValue(

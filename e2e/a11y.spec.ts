@@ -9,7 +9,7 @@ import { expect, test, type Page } from "@playwright/test";
 const TOKEN = "fake-token-for-axe";
 const USER = { id: "u-1", firstName: "Alex", lastName: "Morgan", email: "alex@example.test" };
 
-type Api = "none" | "session" | "session-down" | "session-hang";
+type Api = "none" | "session" | "session-history" | "session-down" | "session-hang";
 
 interface Screen {
   name: string;
@@ -41,6 +41,27 @@ const EXPERTS = [
     notice: "Informational support only. It does not replace a licensed professional.",
   },
 ];
+
+/** A stored conversation of the Head Coach, with an answer that stopped half way. */
+const STORED_CONVERSATION = {
+  messages: [
+    {
+      id: "00000000-0000-4000-8000-000000000001",
+      role: "user",
+      content: "Which lineup do you suggest?",
+      status: "complete",
+      createdAt: "2026-11-17T12:00:00.000Z",
+    },
+    {
+      id: "00000000-0000-4000-8000-000000000002",
+      role: "assistant",
+      content: "Start with a compact midfield and",
+      status: "incomplete",
+      createdAt: "2026-11-17T12:00:01.000Z",
+    },
+  ],
+  nextCursor: null,
+};
 
 const SCREENS: Screen[] = [
   { name: "sign-in", path: "/auth/sign-in", api: "none", ready: heading },
@@ -83,6 +104,23 @@ const SCREENS: Screen[] = [
       await page.getByText("Informational support only.").waitFor();
     },
   },
+  {
+    name: "home (stored conversation)",
+    path: "/app",
+    api: "session-history",
+    signedIn: true,
+    ready: (page) => page.getByText("Incomplete answer").waitFor(),
+  },
+  {
+    name: "home (clear confirmation)",
+    path: "/app",
+    api: "session-history",
+    signedIn: true,
+    ready: async (page) => {
+      await page.getByRole("button", { name: "Clear conversation" }).click();
+      await page.getByRole("alertdialog", { name: "Clear this conversation?" }).waitFor();
+    },
+  },
   { name: "not-found", path: "/does-not-exist", api: "none", ready: heading },
   {
     name: "session-error",
@@ -122,7 +160,20 @@ async function mockApi(page: Page, api: Api) {
       return;
     }
 
-    if (api === "session" && route.request().url().endsWith("/experts")) {
+    const withSession = api === "session" || api === "session-history";
+
+    if (withSession && route.request().url().endsWith("/conversation")) {
+      await route.fulfill({
+        status: 200,
+        headers: { ...cors, "content-type": "application/json" },
+        body: JSON.stringify(
+          api === "session-history" ? STORED_CONVERSATION : { messages: [], nextCursor: null },
+        ),
+      });
+      return;
+    }
+
+    if (withSession && route.request().url().endsWith("/experts")) {
       await route.fulfill({
         status: 200,
         headers: { ...cors, "content-type": "application/json" },
@@ -132,10 +183,10 @@ async function mockApi(page: Page, api: Api) {
     }
 
     await route.fulfill({
-      status: api === "session" ? 200 : 404,
+      status: withSession ? 200 : 404,
       headers: { ...cors, "content-type": "application/json" },
       body: JSON.stringify(
-        api === "session"
+        withSession
           ? { user: USER }
           : { error: { code: "NOT_FOUND", message: "Not found.", details: [] } },
       ),

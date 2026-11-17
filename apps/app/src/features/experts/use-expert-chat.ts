@@ -2,12 +2,12 @@ import { useMutation } from "@tanstack/react-query";
 import { useCallback, useEffect, useReducer, useRef } from "react";
 import { ApiError } from "../../lib/api-client";
 import { isAbortError, streamClient } from "../../lib/stream-client";
-import { buildHistory, chatReducer, type HistoryTurn } from "./chat-state";
+import { apiClient } from "../../lib/api-client";
+import { type ChatMessage, chatReducer } from "./chat-state";
 
 interface AnswerRequest {
   expertId: string;
   content: string;
-  history: HistoryTurn[];
   answerId: string;
   signal: AbortSignal;
 }
@@ -15,8 +15,12 @@ interface AnswerRequest {
 /** The stream ended without a `done` or `error` event: the connection dropped half way. */
 class StreamInterruptedError extends Error {}
 
-function failureStatus(error: unknown): "error" | "unavailable" | "rate-limited" {
+function failureStatus(error: unknown): "error" | "unavailable" | "rate-limited" | "busy" {
   if (error instanceof ApiError) {
+    if (error.status === 409 && error.code === "CONVERSATION_BUSY") {
+      return "busy";
+    }
+
     if (error.status === 503 && error.code === "EXPERT_UNAVAILABLE") {
       return "unavailable";
     }
@@ -30,13 +34,15 @@ function failureStatus(error: unknown): "error" | "unavailable" | "rate-limited"
 }
 
 /**
- * The conversation with one expert, kept only in memory (it goes away with the page, or when the
- * expert changes: the caller remounts with a new `key`). `send` appends the question and streams
- * the answer into a new bubble; `stop` aborts the call; `retry` asks the last question again
- * without duplicating it. Only one answer runs at a time.
+ * The conversation with one expert. It starts from what the server stored (`initialMessages`);
+ * the server keeps the history from then on, so a send carries only the new text. When the expert
+ * changes the caller remounts with a new `key`. `send` appends the question and streams the
+ * answer into a new bubble; `stop` aborts the call (the server keeps the text received as an
+ * incomplete answer); `retry` asks the last question again without duplicating it; `clear`
+ * deletes the conversation on the server. Only one answer runs at a time.
  */
-export function useExpertChat(expertId: string) {
-  const [messages, dispatch] = useReducer(chatReducer, []);
+export function useExpertChat(expertId: string, initialMessages: ChatMessage[] = []) {
+  const [messages, dispatch] = useReducer(chatReducer, initialMessages);
   const messagesRef = useRef(messages);
   const controllerRef = useRef<AbortController | null>(null);
   const idCounter = useRef(0);
@@ -50,13 +56,13 @@ export function useExpertChat(expertId: string) {
   };
 
   const mutation = useMutation<void, unknown, AnswerRequest>({
-    mutationFn: async ({ expertId: id, content, history, answerId, signal }) => {
+    mutationFn: async ({ expertId: id, content, answerId, signal }) => {
       let finished = false;
 
       try {
         for await (const message of streamClient.post(
           `/experts/${id}/messages`,
-          { content, history },
+          { content },
           { signal },
         )) {
           if (message.event === "delta") {
@@ -104,11 +110,11 @@ export function useExpertChat(expertId: string) {
 
   const { mutate } = mutation;
   const start = useCallback(
-    (history: HistoryTurn[], content: string, answerId: string) => {
+    (content: string, answerId: string) => {
       const controller = new AbortController();
 
       controllerRef.current = controller;
-      mutate({ expertId, content, history, answerId, signal: controller.signal });
+      mutate({ expertId, content, answerId, signal: controller.signal });
     },
     [expertId, mutate],
   );
@@ -121,11 +127,10 @@ export function useExpertChat(expertId: string) {
         return;
       }
 
-      const history = buildHistory(messagesRef.current);
       const answerId = nextId();
 
       dispatch({ type: "sent", userId: nextId(), expertId: answerId, content });
-      start(history, content, answerId);
+      start(content, answerId);
     },
     [start],
   );
@@ -147,12 +152,27 @@ export function useExpertChat(expertId: string) {
     const answerId = nextId();
 
     dispatch({ type: "retried", id: last.id, newId: answerId });
-    start(buildHistory(all.slice(0, -2)), question.content, answerId);
+    start(question.content, answerId);
   }, [start]);
 
   const stop = useCallback(() => {
     controllerRef.current?.abort();
   }, []);
 
-  return { messages, isAnswering, send, retry, stop };
+  const clearMutation = useMutation<void, unknown, void>({
+    mutationFn: () => apiClient.delete(`/experts/${expertId}/conversation`),
+    onSuccess: () => dispatch({ type: "cleared" }),
+  });
+
+  return {
+    messages,
+    isAnswering,
+    send,
+    retry,
+    stop,
+    clear: () => clearMutation.mutate(),
+    isClearing: clearMutation.isPending,
+    clearFailed: clearMutation.isError,
+    resetClear: clearMutation.reset,
+  };
 }

@@ -1,11 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  buildHistory,
-  type ChatMessage,
-  chatReducer,
-  HISTORY_LIMIT,
-  MESSAGE_LIMIT,
-} from "./chat-state";
+import { type ChatMessage, chatReducer, fromStoredMessages } from "./chat-state";
 
 const sent = (messages: ChatMessage[], n: number): ChatMessage[] =>
   chatReducer(messages, { type: "sent", userId: `u${n}`, expertId: `a${n}`, content: `q${n}` });
@@ -72,47 +66,63 @@ describe("chatReducer", () => {
   });
 });
 
-describe("buildHistory", () => {
-  it("maps the expert to assistant and leaves out failed or empty answers", () => {
-    const messages: ChatMessage[] = [
-      { id: "u1", role: "user", content: "q1" },
-      { id: "a1", role: "expert", content: "r1", status: "done" },
-      { id: "u2", role: "user", content: "q2" },
-      { id: "a2", role: "expert", content: "", status: "error" },
-      { id: "u3", role: "user", content: "q3" },
-      { id: "a3", role: "expert", content: "parcial", status: "incomplete" },
-      { id: "u4", role: "user", content: "q4" },
-      { id: "a4", role: "expert", content: "", status: "streaming" },
-    ];
+describe("chatReducer: clear and busy", () => {
+  it("empties the conversation when it is cleared", () => {
+    expect(chatReducer(sent([], 1), { type: "cleared" })).toEqual([]);
+  });
 
-    expect(buildHistory(messages)).toEqual([
-      { role: "user", content: "q1" },
-      { role: "assistant", content: "r1" },
-      { role: "user", content: "q2" },
-      { role: "user", content: "q3" },
-      { role: "assistant", content: "parcial" },
-      { role: "user", content: "q4" },
+  it("keeps the busy status of a refused send", () => {
+    expect(chatReducer(sent([], 1), { type: "failed", id: "a1", status: "busy" })[1]).toMatchObject(
+      {
+        status: "busy",
+        content: "",
+      },
+    );
+  });
+});
+
+describe("fromStoredMessages (R9)", () => {
+  it("keeps the order, maps assistant to the expert and marks incomplete answers", () => {
+    expect(
+      fromStoredMessages([
+        {
+          id: "1",
+          role: "user",
+          content: "q1",
+          status: "complete",
+          createdAt: "2026-11-17T12:00:00.000Z",
+        },
+        {
+          id: "2",
+          role: "assistant",
+          content: "r1",
+          status: "complete",
+          createdAt: "2026-11-17T12:00:01.000Z",
+        },
+        {
+          id: "3",
+          role: "user",
+          content: "q2",
+          status: "complete",
+          createdAt: "2026-11-17T12:00:02.000Z",
+        },
+        {
+          id: "4",
+          role: "assistant",
+          content: "parc",
+          status: "incomplete",
+          createdAt: "2026-11-17T12:00:03.000Z",
+        },
+      ]),
+    ).toEqual<ChatMessage[]>([
+      { id: "1", role: "user", content: "q1" },
+      { id: "2", role: "expert", content: "r1", status: "done" },
+      { id: "3", role: "user", content: "q2" },
+      { id: "4", role: "expert", content: "parc", status: "incomplete" },
     ]);
   });
 
-  it("keeps only the last 20 turns", () => {
-    const messages: ChatMessage[] = Array.from({ length: 30 }, (_, index) => ({
-      id: `u${index}`,
-      role: "user" as const,
-      content: `q${index}`,
-    }));
-    const history = buildHistory(messages);
-
-    expect(history).toHaveLength(HISTORY_LIMIT);
-    expect(history[0]?.content).toBe("q10");
-    expect(history.at(-1)?.content).toBe("q29");
-  });
-
-  it("cuts a long text to the limit of the API", () => {
-    const history = buildHistory([
-      { id: "a1", role: "expert", content: "x".repeat(MESSAGE_LIMIT + 50), status: "done" },
-    ]);
-
-    expect(history[0]?.content).toHaveLength(MESSAGE_LIMIT);
+  it("is empty for no messages", () => {
+    expect(fromStoredMessages([])).toEqual([]);
   });
 });

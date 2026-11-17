@@ -81,6 +81,33 @@ export const EXPERTS_FIXTURE = [
 export const isExpertsRequest = (input: Parameters<typeof fetch>[0], init?: RequestInit) =>
   String(input).endsWith("/experts") && (init?.method ?? "GET") === "GET";
 
+const CONVERSATION_PATH = /\/experts\/([^/]+)\/conversation$/;
+
+export const isConversationRead = (input: Parameters<typeof fetch>[0], init?: RequestInit) =>
+  CONVERSATION_PATH.test(String(input)) && (init?.method ?? "GET") === "GET";
+
+/** A stored message as `GET /experts/:expertId/conversation` returns it. */
+export function storedMessage(
+  index: number,
+  role: "user" | "assistant",
+  content: string,
+  status: "complete" | "incomplete" = "complete",
+) {
+  return {
+    id: `00000000-0000-4000-8000-${String(index).padStart(12, "0")}`,
+    role,
+    content,
+    status,
+    createdAt: new Date(Date.UTC(2026, 10, 17, 12, 0, index)).toISOString(),
+  };
+}
+
+/**
+ * What `GET /experts/:expertId/conversation` answers, by expert id; an expert that is not here has
+ * no conversation (an empty list). `stubSessionFetch` empties it, so a test sets its own after.
+ */
+export const storedConversations = new Map<string, () => Response | Promise<Response>>();
+
 /**
  * Replaces `fetch` with a mock that answers the given responses in order, for every call except
  * `GET /experts`: the home asks for the catalog and gets `EXPERTS_FIXTURE` without using up one of
@@ -91,6 +118,8 @@ export function stubSessionFetch(
 ): Mock<typeof fetch> {
   const fetchMock: Mock<typeof fetch> = vi.fn();
 
+  storedConversations.clear();
+
   for (const response of responses) {
     fetchMock.mockImplementationOnce(() => Promise.resolve(response()));
   }
@@ -100,12 +129,27 @@ export function stubSessionFetch(
   return fetchMock;
 }
 
-/** Wraps a fetch mock so that `GET /experts` is answered with `EXPERTS_FIXTURE` and never reaches it. */
+/**
+ * Wraps a fetch mock so that `GET /experts` is answered with `EXPERTS_FIXTURE` and the read of a
+ * conversation with `storedConversations` (empty by default); neither reaches the mock.
+ */
 export function withExpertsCatalog(fetchMock: typeof fetch): typeof fetch {
-  return (input, init) =>
-    isExpertsRequest(input, init)
-      ? Promise.resolve(jsonResponse(200, { experts: EXPERTS_FIXTURE }))
-      : fetchMock(input, init);
+  return (input, init) => {
+    if (isExpertsRequest(input, init)) {
+      return Promise.resolve(jsonResponse(200, { experts: EXPERTS_FIXTURE }));
+    }
+
+    if (isConversationRead(input, init)) {
+      const expertId = CONVERSATION_PATH.exec(String(input))?.[1] ?? "";
+      const stored = storedConversations.get(expertId);
+
+      return Promise.resolve(
+        stored === undefined ? jsonResponse(200, { messages: [], nextCursor: null }) : stored(),
+      );
+    }
+
+    return fetchMock(input, init);
+  };
 }
 
 /** What the page shows once the signed-in area is ready (a heading for assistive technology). */

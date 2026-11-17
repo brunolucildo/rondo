@@ -15,6 +15,8 @@ function failureText(status: ExpertMessage["status"]): string | null {
       return "The experts are unavailable right now.";
     case "rate-limited":
       return "You're sending messages too fast. Wait a moment and try again.";
+    case "busy":
+      return "This expert is still answering.";
     default:
       return null;
   }
