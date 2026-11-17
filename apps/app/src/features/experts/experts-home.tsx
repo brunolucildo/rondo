@@ -1,6 +1,7 @@
 import { Alert } from "@repo/ui/alert";
 import { Button } from "@repo/ui/button";
 import { useState } from "react";
+import { AttachmentsProvider } from "../connections/use-attachments";
 import { ExpertChat } from "./expert-chat";
 import { useExperts } from "./use-experts";
 
@@ -46,7 +47,7 @@ function ExpertsLoadError({ onRetry }: { onRetry: () => void }) {
  * that outlive a conversation: which expert is selected (only for this page, `head-coach` first)
  * and the text being typed.
  */
-export function ExpertsHome() {
+function ExpertsHomeContent() {
   const experts = useExperts();
   const [selectedId, setSelectedId] = useState(DEFAULT_EXPERT_ID);
   const [draft, setDraft] = useState("");
@@ -92,5 +93,14 @@ export function ExpertsHome() {
         onDraftChange={setDraft}
       />
     </>
+  );
+}
+
+/** The chat and the files attached to the next message (they outlive a change of expert). */
+export function ExpertsHome() {
+  return (
+    <AttachmentsProvider>
+      <ExpertsHomeContent />
+    </AttachmentsProvider>
   );
 }

@@ -3,7 +3,7 @@
 > Spec executável. Preencha todas as seções; `TODO` é lacuna, não requisito.
 > Use `create-spec` para criar, `refine-spec` para auditar e `implement-me` para executar.
 
-- **Status:** pronta
+- **Status:** concluída (gates verdes; 3 falhas pré-existentes em `session.service.spec.ts`)
 - **Slug:** 0023-connections-text-files
 - **Data:** 2026-11-17
 - **Atualizado em:** 2026-11-17
@@ -147,6 +147,7 @@ Como validar que a spec foi atendida:
 | Pergunta: a LGPD exige registrar o aceite do aviso no servidor (data e versão do texto) para dados de saúde?                                                   | Nova tabela e fluxo de aceite.                                           | Não         | Jurídico            |
 | Pergunta: o PDF escaneado (sem texto) precisa de OCR na primeira entrega?                                                                                      | Escopo e custo; hoje vira `failed`.                                      | Não         | Produto             |
 | **Premissa:** o limite de envios é por IP (política `connection-upload`), pelo mesmo motivo da 0019: o limitador não enxerga o usuário. | Abuso de custo por contas atrás do mesmo IP. | Não | Eng. |
+| **Premissa (execução):** `processing` existente devolve `202` com `deduplicated: true`; `failed` reenviado devolve `202` com `deduplicated: false`; os chips concluídos são limpos ao enviar a mensagem (a conexão continua na base); PDF com estrutura ilegível vira `NO_EXTRACTABLE_TEXT`; o processamento roda numa fila em memória (concorrência 2, até 20 esperando); o limite de 50 é checado antes do insert (pode passar em 1 ou 2 sob concorrência de arquivos diferentes). | Comportamento nos bordas | Não | Eng. |
 | **Premissa:** o E2E usa o gerador de embeddings falso (`NODE_ENV=test`, como na 0019) e o Weaviate local real. | Como testar o upload completo sem OpenAI. | Não | Eng. |
 
 ## 12. Refinamento
@@ -154,4 +155,5 @@ Como validar que a spec foi atendida:
 | Data       | O que mudou            | Motivo                                          |
 | ---------- | ---------------------- | ----------------------------------------------- |
 | 2026-11-17 | Spec criada (rascunho) | Quebra do épico de experts (`breakdown-specs`). |
+| 2026-11-17 | Execução (`implement-me`): premissas registradas ao lado; limites ficaram como constantes em `connection-rules.ts` (não em `.env.example`); hash calculado sobre o buffer (20 MB), não em fluxo | Mapeamento da implementação |
 | 2026-11-17 | R2 detalhado (limite por IP; limite de 50 só vale para conexão nova, com critério); passo 8 inclui o ADR; premissas de limite e de E2E | Auditoria: o limitador não enxerga o usuário; conflito entre o limite de 50 e a dedup; `RULES.md` §5 pede ADR |

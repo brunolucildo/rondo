@@ -6,6 +6,8 @@ import { RateLimitModule } from "./modules/rate-limit";
 import { EmailModule } from "./modules/email";
 import { AuthModule } from "./modules/auth";
 import { ExpertsModule } from "./modules/experts";
+import { KnowledgeModule } from "./modules/knowledge";
+import { ConnectionsModule } from "./modules/connections";
 
 @Module({
   imports: [
@@ -18,6 +20,8 @@ import { ExpertsModule } from "./modules/experts";
     EmailModule,
     AuthModule,
     ExpertsModule,
+    KnowledgeModule,
+    ConnectionsModule,
   ],
   controllers: [HealthController],
 })

@@ -20,6 +20,12 @@ process.env.E2E_API_URL = API_URL;
 // A fixed test-only value (never a real secret), unless the environment already provides one.
 process.env.AUTH_JWT_SECRET ??= "e2e-only-jwt-secret-0123456789-abcdefghijk";
 
+// The API needs the local Weaviate (development container, public dev key) for the connections.
+// The E2E writes to a collection of its own, never to the product one.
+process.env.WEAVIATE_URL ??= "http://localhost:8080";
+process.env.WEAVIATE_API_KEY ??= "rondo-dev-weaviate-key";
+process.env.WEAVIATE_COLLECTION ??= "KnowledgeChunkTest";
+
 export default defineConfig({
   testDir: "./e2e",
   globalTeardown: "./e2e/support/global-teardown.ts",
@@ -60,6 +66,9 @@ export default defineConfig({
         APP_URL,
         DATABASE_URL: process.env.DATABASE_URL as string,
         AUTH_JWT_SECRET: process.env.AUTH_JWT_SECRET as string,
+        WEAVIATE_URL: process.env.WEAVIATE_URL as string,
+        WEAVIATE_API_KEY: process.env.WEAVIATE_API_KEY as string,
+        WEAVIATE_COLLECTION: process.env.WEAVIATE_COLLECTION as string,
         NODE_ENV: "test",
         EMAIL_FROM: "Rondo <no-reply@rondo.local>",
         TRUST_PROXY: "false",

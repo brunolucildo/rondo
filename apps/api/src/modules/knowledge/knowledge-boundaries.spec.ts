@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 const SRC = join(__dirname, "..", "..");
 const KNOWLEDGE_MODULE = join(SRC, "modules", "knowledge");
 const EXPERTS_INFRASTRUCTURE = join(SRC, "modules", "experts", "infrastructure");
+const CONNECTIONS_INFRASTRUCTURE = join(SRC, "modules", "connections", "infrastructure");
 
 function sourceFiles(directory: string): string[] {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -69,13 +70,13 @@ describe("knowledge module boundaries", () => {
     expect(offenders).toEqual([]);
   });
 
-  it("never imports the Weaviate or LangChain SDKs outside the knowledge module (the experts graph is the only other LangChain user)", () => {
+  it("never imports the Weaviate or LangChain SDKs outside the knowledge module (only the experts graph and the connections document loaders use LangChain, never the Weaviate packages)", () => {
     const offenders = sourceFiles(SRC)
       .filter((file) => !file.startsWith(KNOWLEDGE_MODULE))
       .flatMap((file) =>
         importsOf(file)
           .filter((target) =>
-            file.startsWith(EXPERTS_INFRASTRUCTURE)
+            file.startsWith(EXPERTS_INFRASTRUCTURE) || file.startsWith(CONNECTIONS_INFRASTRUCTURE)
               ? /^weaviate-client|^@langchain\/weaviate/.test(target)
               : /^weaviate-client|^@langchain\//.test(target),
           )

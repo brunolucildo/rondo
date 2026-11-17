@@ -12,6 +12,7 @@ describe("AUTH_RATE_LIMIT_POLICIES", () => {
       "forgot-password": { limit: 3, windowSeconds: 600, keyBy: "ip-and-email" },
       "reset-password": { limit: 10, windowSeconds: 600, keyBy: "ip" },
       "expert-message": { limit: 20, windowSeconds: 60, keyBy: "ip" },
+      "connection-upload": { limit: 20, windowSeconds: 600, keyBy: "ip" },
     });
   });
 });
