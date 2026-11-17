@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 const SRC = join(__dirname, "..", "..");
 const KNOWLEDGE_MODULE = join(SRC, "modules", "knowledge");
+const EXPERTS_INFRASTRUCTURE = join(SRC, "modules", "experts", "infrastructure");
 
 function sourceFiles(directory: string): string[] {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -68,12 +69,16 @@ describe("knowledge module boundaries", () => {
     expect(offenders).toEqual([]);
   });
 
-  it("never imports the Weaviate or OpenAI SDKs outside the knowledge module", () => {
+  it("never imports the Weaviate or LangChain SDKs outside the knowledge module (the experts graph is the only other LangChain user)", () => {
     const offenders = sourceFiles(SRC)
       .filter((file) => !file.startsWith(KNOWLEDGE_MODULE))
       .flatMap((file) =>
         importsOf(file)
-          .filter((target) => /^weaviate-client|^@langchain\//.test(target))
+          .filter((target) =>
+            file.startsWith(EXPERTS_INFRASTRUCTURE)
+              ? /^weaviate-client|^@langchain\/weaviate/.test(target)
+              : /^weaviate-client|^@langchain\//.test(target),
+          )
           .map((target) => `${relative(SRC, file).split(sep).join("/")} -> ${target}`),
       );
 
