@@ -1,6 +1,9 @@
 import { Body, Controller, HttpStatus, Inject, Param, Post, Req, Res } from "@nestjs/common";
 import { ApiException } from "../../../../common/api-exception";
-import { logExpertMessage, traceExpertMessage } from "../../../../observability/expert-telemetry";
+import {
+  recordExpertMessage,
+  traceExpertMessage,
+} from "../../../../observability/expert-telemetry";
 import { type ActiveSession, CurrentSession } from "../../../auth";
 import { RateLimit } from "../../../rate-limit";
 import { SendExpertMessage } from "../../application/use-cases/send-expert-message.use-case";
@@ -46,6 +49,7 @@ export class SendExpertMessageRequestHandler {
     @Req() request: RequestWithId,
     @Res() response: ClosableResponse,
   ): Promise<void> {
+    const startedAt = performance.now();
     const abort = new AbortController();
     const requestId = typeof request.id === "string" ? request.id : undefined;
     // Registered before the first await: a client that leaves while the conversation is being read
@@ -96,7 +100,7 @@ export class SendExpertMessageRequestHandler {
       }
 
       if (error instanceof ExpertUnavailableError) {
-        logExpertMessage(
+        recordExpertMessage(
           { expertId, requestId },
           { outcome: "failure", reason: "unavailable", inputTokens: null, outputTokens: null },
           0,
@@ -112,8 +116,8 @@ export class SendExpertMessageRequestHandler {
     }
 
     try {
-      await traceExpertMessage({ expertId, requestId }, () =>
-        writeAnswerStream(response, sent.events),
+      await traceExpertMessage({ expertId, requestId, startedAt }, (probe) =>
+        writeAnswerStream(response, sent.events, probe),
       );
     } finally {
       sent.release();

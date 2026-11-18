@@ -1,4 +1,4 @@
-import { metrics, SpanStatusCode, trace } from "@opentelemetry/api";
+import { metrics, SpanKind, SpanStatusCode, trace } from "@opentelemetry/api";
 import { DURATION_BUCKETS_SECONDS } from "./duration-buckets";
 import { baseLogger } from "./logger";
 
@@ -146,15 +146,17 @@ export function recordEmbeddingsCall(call: EmbeddingsCall): void {
 /**
  * Runs one operation inside the span `<name>`, a child of whatever is active. The span carries the
  * operation and the outcome only; on failure it gets status `ERROR` and the closed `reason`, never
- * the exception message, stack or event. The error is rethrown untouched.
+ * the exception message, stack or event. The error is rethrown untouched. `kind` is `CLIENT` for a
+ * call to something outside the process (the index, the embeddings provider).
  */
 export async function traceKnowledge<T>(
   name: string,
   attributes: Record<string, string>,
   run: () => Promise<T>,
   reasonOf: (error: unknown) => KnowledgeFailureReason,
+  kind: SpanKind = SpanKind.INTERNAL,
 ): Promise<T> {
-  return trace.getTracer(METER_NAME).startActiveSpan(name, { attributes }, async (span) => {
+  return trace.getTracer(METER_NAME).startActiveSpan(name, { attributes, kind }, async (span) => {
     try {
       const result = await run();
 

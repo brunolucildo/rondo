@@ -124,7 +124,11 @@ describe("knowledge telemetry (R8)", () => {
       ]),
     );
     expect(
-      warnSpy.mock.calls.map((call: unknown[]) => (call[0] as { reason: string }).reason).sort(),
+      warnSpy.mock.calls
+        .map((call: unknown[]) => call[0] as { event: string; reason: string })
+        .filter((fields: { event: string }) => fields.event === "knowledge_index_operation")
+        .map((fields: { reason: string }) => fields.reason)
+        .sort(),
     ).toEqual(["connection", "unknown"]);
     expect(recorder.spans().every((span) => span.status.code === 2)).toBe(true);
     expect(recorder.spans().flatMap((span) => span.events)).toEqual([]);

@@ -17,7 +17,8 @@ const endpoint = (process.env.OTEL_EXPORTER_OTLP_ENDPOINT ?? "http://localhost:4
 
 const timeoutMillis = Number(process.env.OTEL_EXPORTER_OTLP_TIMEOUT ?? 3000);
 
-const sdk = new NodeSDK({
+// Exported so the integration test can start it against a Collector that is down.
+export const sdk = new NodeSDK({
   // Sem detectores de host/processo: evitam exportar nome da máquina e caminhos locais.
   resourceDetectors: [],
   resource: resourceFromAttributes({
