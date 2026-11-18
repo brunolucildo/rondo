@@ -18,7 +18,7 @@ import { isUuidLike } from "../domain/connection-rules";
 import { DataAccessError } from "./data-access-error";
 
 const COLUMNS =
-  "id, user_id, kind, name, size_bytes, content_hash, status, chunk_count, error_code, created_at, updated_at";
+  "id, user_id, kind, name, size_bytes, content_hash, url_hash, status, chunk_count, error_code, created_at, updated_at";
 
 const STATUSES: readonly ConnectionStatus[] = ["processing", "ready", "failed"];
 
@@ -30,6 +30,7 @@ interface ConnectionRow extends QueryResultRow {
   /** `bigint` arrives as a string. */
   size_bytes: unknown;
   content_hash: unknown;
+  url_hash: unknown;
   status: unknown;
   chunk_count: unknown;
   error_code: unknown;
@@ -50,6 +51,7 @@ function toConnection(operation: string, row: ConnectionRow): Connection {
     typeof row.user_id !== "string" ||
     typeof row.name !== "string" ||
     typeof row.content_hash !== "string" ||
+    (row.url_hash !== null && typeof row.url_hash !== "string") ||
     !CONNECTION_KINDS.includes(row.kind as ConnectionKind) ||
     !STATUSES.includes(row.status as ConnectionStatus) ||
     !Number.isSafeInteger(sizeBytes) ||
@@ -69,6 +71,7 @@ function toConnection(operation: string, row: ConnectionRow): Connection {
     name: row.name,
     sizeBytes,
     contentHash: row.content_hash,
+    urlHash: row.url_hash,
     status: row.status as ConnectionStatus,
     chunkCount: row.chunk_count,
     errorCode: row.error_code as ConnectionErrorCode | null,
@@ -123,6 +126,15 @@ export class PostgresConnectionRepository implements ConnectionRepository {
     );
   }
 
+  findByUrlHash(userId: string, urlHash: string): Promise<Connection | null> {
+    return this.one(
+      "connections_find_by_url_hash",
+      { operation: "select", collection: "connections" },
+      `select ${COLUMNS} from public.connections where user_id = $1 and url_hash = $2`,
+      [userId, urlHash],
+    );
+  }
+
   async countByUser(userId: string): Promise<number> {
     const [row] = await this.run(
       "connections_count",
@@ -159,19 +171,31 @@ export class PostgresConnectionRepository implements ConnectionRepository {
     const inserted = await this.one(
       "connections_insert",
       { operation: "insert", collection: "connections" },
-      `insert into public.connections (user_id, kind, name, size_bytes, content_hash, status)
-       values ($1, $2, $3, $4, $5, 'processing')
-       on conflict (user_id, content_hash) do nothing
+      `insert into public.connections (user_id, kind, name, size_bytes, content_hash, url_hash, status)
+       values ($1, $2, $3, $4, $5, $6, 'processing')
+       on conflict do nothing
        returning ${COLUMNS}`,
-      [userId, connection.kind, connection.name, connection.sizeBytes, connection.contentHash],
+      [
+        userId,
+        connection.kind,
+        connection.name,
+        connection.sizeBytes,
+        connection.contentHash,
+        connection.urlHash ?? null,
+      ],
     );
 
     if (inserted !== null) {
       return { connection: inserted, created: true };
     }
 
-    // The unique index said another request got there first: that row is the answer.
-    const existing = await this.findByContentHash(userId, connection.contentHash);
+    // A unique index (content or, for a link, its URL) said another request got there first: that
+    // row is the answer.
+    const existing =
+      (await this.findByContentHash(userId, connection.contentHash)) ??
+      (connection.urlHash === undefined
+        ? null
+        : await this.findByUrlHash(userId, connection.urlHash));
 
     if (existing === null) {
       throw new DataAccessError("connections_insert", "UNEXPECTED_RESULT");

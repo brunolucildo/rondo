@@ -1,10 +1,13 @@
 import type { Connection, ConnectionErrorCode, ConnectionKind } from "./connection";
+import type { UrlBlockReason } from "./external-url";
 
 export interface NewConnection {
   kind: ConnectionKind;
   name: string;
   sizeBytes: number;
   contentHash: string;
+  /** Only for links. */
+  urlHash?: string;
 }
 
 export interface InsertedConnection {
@@ -20,10 +23,14 @@ export interface InsertedConnection {
 export interface ConnectionRepository {
   findById(userId: string, connectionId: string): Promise<Connection | null>;
   findByContentHash(userId: string, contentHash: string): Promise<Connection | null>;
+  findByUrlHash(userId: string, urlHash: string): Promise<Connection | null>;
   countByUser(userId: string): Promise<number>;
   /** True when the user has at least one `ready` connection (what the experts may search). */
   hasReadyConnection(userId: string): Promise<boolean>;
-  /** Inserts as `processing`; on a duplicate `(user, hash)` returns the existing row, `created: false`. */
+  /**
+   * Inserts as `processing`; on a duplicate `(user, content hash)` or `(user, url hash)` returns the
+   * existing row, `created: false`.
+   */
   insertProcessing(userId: string, connection: NewConnection): Promise<InsertedConnection>;
   /** `failed` to `processing`, atomically; `null` when it is no longer `failed` (someone else took it). */
   claimFailed(userId: string, connectionId: string): Promise<Connection | null>;
@@ -84,6 +91,16 @@ export interface IngestionResult {
   chunkCount: number;
 }
 
+/** What one search of a link came to, as telemetry sees it: closed sets and numbers, never the link. */
+export interface UrlFetchRecord {
+  outcome: "success" | "failure" | "blocked";
+  /** `none` on success, the block reason when blocked, else the lower-case fetch or extraction code. */
+  reason: "none" | UrlBlockReason | Lowercase<ConnectionErrorCode>;
+  durationSeconds: number;
+  /** Bytes of the page that came back (0 when none). */
+  sizeBytes: number;
+}
+
 /** `single`: one connection; `all`: every connection of the user. */
 export type DeletionScope = "single" | "all";
 
@@ -105,4 +122,12 @@ export interface ConnectionTelemetry {
   recordDeduplicated(kind: ConnectionKind, durationSeconds: number): void;
   /** One deletion request: scope, outcome and duration only, never a name, id or content. */
   recordDeletion(scope: DeletionScope, outcome: DeletionOutcome, durationSeconds: number): void;
+  /** One search of a link (spec 0027): outcome, reason, duration and size. Never the link, host or content. */
+  recordUrlFetch(record: UrlFetchRecord): void;
+  /** An ingestion that ended before a connection existed (a link that could not be fetched or read). */
+  recordRejected(
+    kind: ConnectionKind,
+    reason: Lowercase<ConnectionErrorCode>,
+    durationSeconds: number,
+  ): void;
 }

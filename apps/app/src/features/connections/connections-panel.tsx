@@ -45,7 +45,9 @@ interface ConnectionRowProps {
 
 function ConnectionRow({ connection, disabled, onDelete }: ConnectionRowProps) {
   const failure =
-    connection.status === "failed" ? describeProcessingFailure(connection.errorCode).text : null;
+    connection.status === "failed"
+      ? describeProcessingFailure(connection.errorCode, connection.kind).text
+      : null;
 
   return (
     <li className="flex flex-col gap-2 rounded-md border-2 border-border bg-background p-3 sm:flex-row sm:items-center">

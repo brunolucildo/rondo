@@ -12,7 +12,7 @@ import { baseLogger } from "./logger";
 
 const METER_NAME = "rondo-api";
 
-export type ConnectionIngestionKind = "pdf" | "txt" | "md";
+export type ConnectionIngestionKind = "pdf" | "txt" | "md" | "url";
 export type ConnectionIngestionOutcome = "success" | "failure";
 
 /** Closed set for the `reason` of a failed ingestion (the lower-case error codes). */
@@ -21,7 +21,13 @@ export type ConnectionIngestionReason =
   | "no_extractable_text"
   | "pdf_protected"
   | "too_many_chunks"
-  | "processing_unavailable";
+  | "processing_unavailable"
+  | "url_not_allowed"
+  | "fetch_failed"
+  | "fetch_timeout"
+  | "response_too_large"
+  | "unsupported_content_type"
+  | "too_many_redirects";
 
 export interface ConnectionIngestionResult {
   outcome: ConnectionIngestionOutcome;
@@ -48,6 +54,15 @@ function createInstruments() {
       description: "Connection deletion requests (spec 0025), by scope and outcome.",
       unit: "{deletion}",
     }),
+    urlBlocked: meter.createCounter("url_fetch.blocked", {
+      description: "Links refused by the egress rules (spec 0027), by reason.",
+      unit: "{request}",
+    }),
+    urlFetchDuration: meter.createHistogram("url_fetch.duration", {
+      description: "Time to fetch a link (spec 0027), by outcome.",
+      unit: "s",
+      advice: { explicitBucketBoundaries: DURATION_BUCKETS_SECONDS },
+    }),
   };
 }
 
@@ -58,6 +73,48 @@ function getInstruments() {
   instruments ??= createInstruments();
 
   return instruments;
+}
+
+export type UrlBlockMetricReason = "scheme" | "port" | "credentials" | "address" | "redirect";
+
+export interface UrlFetchTelemetry {
+  outcome: "success" | "failure" | "blocked";
+  reason: "none" | UrlBlockMetricReason | ConnectionIngestionReason;
+  durationSeconds: number;
+  sizeBytes: number;
+}
+
+/**
+ * Counter, histogram and `url_fetch` log of one search of a link (spec 0027). The dimensions are
+ * closed sets; the log carries the outcome, the reason, the duration and the size. Never the link,
+ * the host, the path, an address or any content. Never throws.
+ */
+export function recordUrlFetch(record: UrlFetchTelemetry): void {
+  try {
+    const { urlBlocked, urlFetchDuration } = getInstruments();
+
+    if (record.outcome === "blocked") {
+      urlBlocked.add(1, { reason: record.reason });
+    }
+
+    urlFetchDuration.record(record.durationSeconds, { outcome: record.outcome });
+
+    const fields = {
+      event: "url_fetch",
+      outcome: record.outcome,
+      reason: record.reason,
+      durationMs: Math.round(record.durationSeconds * 1000),
+      sizeBytes: record.sizeBytes,
+    };
+
+    if (record.outcome === "success") {
+      baseLogger.info(fields, "url_fetch");
+    } else {
+      baseLogger.warn(fields, "url_fetch");
+    }
+  } catch {
+    // Telemetry must never change the answer.
+  }
 }
 
 export type ConnectionDeletionScope = "single" | "all";

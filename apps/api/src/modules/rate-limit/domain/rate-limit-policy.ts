@@ -26,6 +26,8 @@ export const AUTH_RATE_LIMIT_POLICIES = {
   "expert-message": { limit: 20, windowSeconds: 60, keyBy: "ip" },
   // Per IP, like the one above: 20 uploads per 10 minutes (each can cost embeddings).
   "connection-upload": { limit: 20, windowSeconds: 10 * 60, keyBy: "ip" },
+  // Per IP too: each link makes the server fetch an address the user chose (spec 0027).
+  "connection-url": { limit: 10, windowSeconds: 10 * 60, keyBy: "ip" },
 } as const satisfies Record<string, RateLimitPolicy>;
 
 export type RateLimitPolicies = Readonly<Record<string, RateLimitPolicy>>;

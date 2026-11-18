@@ -33,6 +33,14 @@ export class InMemoryConnectionRepository implements ConnectionRepository {
     return Promise.resolve(row === undefined ? null : { ...row });
   }
 
+  findByUrlHash(userId: string, urlHash: string): Promise<Connection | null> {
+    const row = [...this.rows.values()].find(
+      (candidate) => candidate.userId === userId && candidate.urlHash === urlHash,
+    );
+
+    return Promise.resolve(row === undefined ? null : { ...row });
+  }
+
   countByUser(userId: string): Promise<number> {
     return Promise.resolve([...this.rows.values()].filter((row) => row.userId === userId).length);
   }
@@ -46,7 +54,10 @@ export class InMemoryConnectionRepository implements ConnectionRepository {
   insertProcessing(userId: string, connection: NewConnection): Promise<InsertedConnection> {
     // No `await` between the lookup and the insert: like the unique index, one caller wins.
     const existing = [...this.rows.values()].find(
-      (row) => row.userId === userId && row.contentHash === connection.contentHash,
+      (row) =>
+        row.userId === userId &&
+        (row.contentHash === connection.contentHash ||
+          (connection.urlHash !== undefined && row.urlHash === connection.urlHash)),
     );
 
     if (existing !== undefined) {

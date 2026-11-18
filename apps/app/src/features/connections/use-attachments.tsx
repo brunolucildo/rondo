@@ -13,9 +13,11 @@ import { uploadClient } from "../../lib/upload-client";
 import {
   checkFileBeforeUpload,
   type ConnectionDto,
+  describeLinkFailure,
   describeProcessingFailure,
   describeUploadFailure,
   type FailureMessage,
+  linkLabel,
 } from "./connection-messages";
 import { PrivacyNotice } from "./privacy-notice";
 
@@ -36,9 +38,12 @@ export interface AttachmentView {
   canRetry: boolean;
 }
 
+/** What the person attached: a file, or a link. A link lives in memory only, to be sent again on retry. */
+type AttachmentSource = { kind: "file"; file: File } | { kind: "link"; url: string };
+
 interface Attachment {
   id: string;
-  file: File;
+  source: AttachmentSource;
   /** Set once the API answered; the status is then followed by polling. */
   connectionId: string | null;
   /** Why the upload itself was refused or failed. */
@@ -138,6 +143,8 @@ interface AttachmentsContextValue {
   /** True while a file is uploading, processing or was refused by the server: `Send` must wait. */
   isBusy: boolean;
   addFile: (file: File) => void;
+  /** Connects a link (spec 0027); the privacy notice comes first on the first use. */
+  addLink: (url: string) => void;
   removeAttachment: (id: string) => void;
   retryAttachment: (id: string) => void;
   /** Drops the chips that are not in progress (the message was sent). */
@@ -162,7 +169,8 @@ const AttachmentsContext = createContext<AttachmentsContextValue | null>(null);
 const NO_REMOVED_CONNECTIONS: ReadonlySet<string> = new Set();
 
 function viewOf(item: Attachment, connection: ConnectionDto | undefined): AttachmentView {
-  const base = { id: item.id, name: item.file.name };
+  const name = item.source.kind === "file" ? item.source.file.name : linkLabel(item.source.url);
+  const base = { id: item.id, name };
 
   if (item.rejection !== null) {
     return {
@@ -186,7 +194,7 @@ function viewOf(item: Attachment, connection: ConnectionDto | undefined): Attach
   }
 
   if (connection?.status === "failed") {
-    const failure = describeProcessingFailure(connection.errorCode);
+    const failure = describeProcessingFailure(connection.errorCode, connection.kind);
 
     return { ...base, phase: "failed", message: failure.text, canRetry: failure.retryable };
   }
@@ -204,11 +212,14 @@ function viewOf(item: Attachment, connection: ConnectionDto | undefined): Attach
 export function AttachmentsProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const [items, dispatch] = useReducer(reducer, []);
-  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [pendingSource, setPendingSource] = useState<AttachmentSource | null>(null);
   const [removedConnectionIds, setRemovedConnectionIds] = useState<ReadonlySet<string>>(new Set());
   const counter = useRef(0);
   const { mutateAsync } = useMutation({
-    mutationFn: (file: File) => uploadClient.postFile<ConnectionDto>("/connections", file),
+    mutationFn: (source: AttachmentSource) =>
+      source.kind === "file"
+        ? uploadClient.postFile<ConnectionDto>("/connections", source.file)
+        : apiClient.post<ConnectionDto>("/connections/url", { url: source.url }),
   });
 
   // One query per connection: the same file attached twice is one connection (deduplication).
@@ -224,47 +235,58 @@ export function AttachmentsProvider({ children }: { children: ReactNode }) {
   );
 
   const send = useCallback(
-    async (id: string, file: File) => {
+    async (id: string, source: AttachmentSource) => {
       try {
-        const connection = await mutateAsync(file);
+        const connection = await mutateAsync(source);
 
         queryClient.setQueryData(["connections", connection.id], connection);
         dispatch({ type: "sent", id, connectionId: connection.id });
       } catch (error) {
-        dispatch({ type: "rejected", id, rejection: describeUploadFailure(error) });
+        dispatch({
+          type: "rejected",
+          id,
+          rejection:
+            source.kind === "file" ? describeUploadFailure(error) : describeLinkFailure(error),
+        });
       }
     },
     [mutateAsync, queryClient],
   );
 
   const start = useCallback(
-    (file: File) => {
+    (source: AttachmentSource) => {
       counter.current += 1;
 
       const id = `attachment-${counter.current}`;
-      const refusal = checkFileBeforeUpload(file);
+      const refusal = source.kind === "file" ? checkFileBeforeUpload(source.file) : null;
 
       dispatch({
         type: "added",
-        attachment: { id, file, connectionId: null, rejection: refusal, problem: null },
+        attachment: { id, source, connectionId: null, rejection: refusal, problem: null },
       });
 
       if (refusal === null) {
-        void send(id, file);
+        void send(id, source);
       }
     },
     [send],
   );
 
-  const addFile = useCallback(
-    (file: File) => {
+  const addSource = useCallback(
+    (source: AttachmentSource) => {
       if (readPrivacyAccepted()) {
-        start(file);
+        start(source);
       } else {
-        setPendingFile(file);
+        setPendingSource(source);
       }
     },
     [start],
+  );
+
+  const addFile = useCallback((file: File) => addSource({ kind: "file", file }), [addSource]);
+  const addLink = useCallback(
+    (url: string) => addSource({ kind: "link", url: url.trim() }),
+    [addSource],
   );
 
   const connectionsDeleted = useCallback(
@@ -289,13 +311,14 @@ export function AttachmentsProvider({ children }: { children: ReactNode }) {
       items.some((item) => item.problem !== null) ||
       views.some((view) => view.phase === "uploading" || view.phase === "processing"),
     addFile,
+    addLink,
     removeAttachment: (id) => dispatch({ type: "removed", id }),
     retryAttachment: (id) => {
       const item = items.find((candidate) => candidate.id === id);
 
       if (item !== undefined) {
         dispatch({ type: "restarted", id });
-        void send(id, item.file);
+        void send(id, item.source);
       }
     },
     readyConnectionIds: [
@@ -325,14 +348,14 @@ export function AttachmentsProvider({ children }: { children: ReactNode }) {
   return (
     <AttachmentsContext.Provider value={value}>
       {children}
-      {pendingFile === null ? null : (
+      {pendingSource === null ? null : (
         <PrivacyNotice
           onAccept={() => {
             rememberPrivacyAccepted();
-            start(pendingFile);
-            setPendingFile(null);
+            start(pendingSource);
+            setPendingSource(null);
           }}
-          onCancel={() => setPendingFile(null)}
+          onCancel={() => setPendingSource(null)}
         />
       )}
     </AttachmentsContext.Provider>

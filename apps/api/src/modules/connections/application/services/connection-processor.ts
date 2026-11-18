@@ -1,10 +1,11 @@
 import type { EmbeddingsGenerator, KnowledgeIndex } from "../../../knowledge";
-import type { Connection, ConnectionErrorCode, ConnectionKind } from "../../domain/connection";
+import type { Connection, ConnectionErrorCode, FileConnectionKind } from "../../domain/connection";
 import { ConnectionProcessingError } from "../../domain/connection-errors";
 import type {
   ConnectionRepository,
   ConnectionTelemetry,
   DocumentExtractor,
+  ExtractedSection,
   IngestionResult,
   TextChunker,
 } from "../../domain/connection-ports";
@@ -19,7 +20,7 @@ const MAX_WAITING_JOBS = 20;
 
 export interface ConnectionProcessorDependencies {
   repository: ConnectionRepository;
-  extractors: Readonly<Record<ConnectionKind, DocumentExtractor>>;
+  extractors: Readonly<Record<FileConnectionKind, DocumentExtractor>>;
   chunker: TextChunker;
   embeddings: EmbeddingsGenerator;
   index: KnowledgeIndex;
@@ -34,6 +35,8 @@ export interface ProcessRequest {
   connection: Connection;
   /** The file. Held in memory until the job ends; never written anywhere but the extractor's temp directory. */
   bytes: Uint8Array;
+  /** A link (spec 0027): the text was already extracted at the request, so there is nothing to read. */
+  sections?: readonly ExtractedSection[];
   /** Remove the vectors of this connection first (a retry after a failure may have left some). */
   clearFirst: boolean;
 }
@@ -148,12 +151,20 @@ export class ConnectionProcessor {
     );
   }
 
-  private async ingest({ userId, connection, bytes, clearFirst }: ProcessRequest): Promise<number> {
+  private async ingest({
+    userId,
+    connection,
+    bytes,
+    sections: extracted,
+    clearFirst,
+  }: ProcessRequest): Promise<number> {
     const { extractors, chunker, embeddings, index } = this.deps;
-    const sections = await withTimeout(
-      extractors[connection.kind].extract(bytes),
-      this.extractionTimeoutMs,
-    );
+    const sections =
+      extracted ??
+      (await withTimeout(
+        extractors[connection.kind as FileConnectionKind].extract(bytes),
+        this.extractionTimeoutMs,
+      ));
     const chunks = await chunker.chunk(sections);
 
     if (chunks.length === 0) {

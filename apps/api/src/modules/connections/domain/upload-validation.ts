@@ -1,4 +1,4 @@
-import type { ConnectionKind } from "./connection";
+import type { FileConnectionKind } from "./connection";
 import { MAX_FILE_BYTES } from "./connection-rules";
 import { InvalidUploadError } from "./connection-errors";
 
@@ -33,7 +33,7 @@ function isUtf8Text(bytes: Uint8Array): boolean {
  * its kind (`%PDF-` for PDF, valid UTF-8 without NUL bytes for TXT and Markdown). The extension and
  * the content type were already checked, but they are claims: only the bytes decide.
  */
-export function assertUploadContent(kind: ConnectionKind, bytes: Uint8Array): void {
+export function assertUploadContent(kind: FileConnectionKind, bytes: Uint8Array): void {
   if (bytes.byteLength === 0) {
     throw new InvalidUploadError("EMPTY_FILE");
   }

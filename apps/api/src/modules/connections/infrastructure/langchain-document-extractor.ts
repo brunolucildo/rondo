@@ -5,14 +5,14 @@ import { DirectoryLoader, UnknownHandling } from "@langchain/classic/document_lo
 import { TextLoader } from "@langchain/classic/document_loaders/fs/text";
 import type { BaseDocumentLoader } from "@langchain/core/document_loaders/base";
 import { PDFLoader } from "@langchain/community/document_loaders/fs/pdf";
-import type { ConnectionKind } from "../domain/connection";
+import type { FileConnectionKind } from "../domain/connection";
 import { ConnectionProcessingError } from "../domain/connection-errors";
 import type { DocumentExtractor, ExtractedSection } from "../domain/connection-ports";
 
 type LoaderFactory = (filePath: string) => BaseDocumentLoader;
 
 /** One loader per kind: TXT and Markdown are plain text; PDF goes through `pdf-parse`. */
-const LOADERS: Readonly<Record<ConnectionKind, LoaderFactory>> = {
+const LOADERS: Readonly<Record<FileConnectionKind, LoaderFactory>> = {
   pdf: (filePath) => new PDFLoader(filePath, { splitPages: true }),
   txt: (filePath) => new TextLoader(filePath),
   md: (filePath) => new TextLoader(filePath),
@@ -41,7 +41,7 @@ const PAGE_NUMBER = (metadata: Record<string, unknown>): number | undefined => {
   return undefined;
 };
 
-function classify(kind: ConnectionKind, error: unknown): unknown {
+function classify(kind: FileConnectionKind, error: unknown): unknown {
   if (kind !== "pdf" || typeof error !== "object" || error === null || !("name" in error)) {
     return error;
   }
@@ -65,7 +65,7 @@ function classify(kind: ConnectionKind, error: unknown): unknown {
  */
 export class LangChainDocumentExtractor implements DocumentExtractor {
   constructor(
-    private readonly kind: ConnectionKind,
+    private readonly kind: FileConnectionKind,
     private readonly workRoot: string = tmpdir(),
   ) {}
 
