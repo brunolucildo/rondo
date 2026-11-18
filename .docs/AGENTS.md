@@ -18,6 +18,8 @@
 | entender os agentes especialistas e como se ligam ao produto | `EXPERTS.md`                     |
 | entender a home e o redesign visual                          | `HOME.md`                        |
 | ver evidências de testes e observabilidade                   | `QUALITY.md`                     |
+| entender como os testes funcionam e escrever um novo         | `TESTING.md`                     |
+| entender como as métricas, traces e logs são coletados       | `OBSERVABILITY.md`               |
 | ver como a IA foi usada no desenvolvimento                   | `AI_PROCESS.md`                  |
 | tocar em estrutura, apps, pacotes ou stack                   | `ARCHITECTURE.md`                |
 | criar ou alterar UI                                          | `DESIGN.md` + `DESIGN_SYSTEM.md` |

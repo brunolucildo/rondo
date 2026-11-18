@@ -18,7 +18,7 @@
 | Testes E2E                  | Playwright (`home`, `routing`, `sign-up`, `forgot-password`, `confirm-account`, `session`, `sign-out`, `sign-in`, `reset-password`); sobe app e API (`capture`) e exige o Postgres local; passa                        |
 | Cobertura                   | `bun run test:coverage` gera `coverage/` e **falha abaixo do piso** (api 78/75/68/78, app 92/85/94/92 de statements/branches/functions/lines; medido em 2026-11-18: api 81,2/78,1/71,2/81,4 e app 95,7/89,4/97,4/95,8) |
 | Hooks de pre-commit         | Configurados (`lefthook.yml`); validados no commit raiz `227e0ad`                                                                                                                                                      |
-| CI                          | `.github/workflows/ci.yml` (lint, tipos, build e testes unitários com cobertura); primeira execução no GitHub ainda não verificada; integração e E2E só locais                                                         |
+| CI                          | `.github/workflows/ci.yml` (lint, tipos, build e testes unitários com cobertura); executou com sucesso no PR #14; integração e E2E só locais                                                                           |
 | Acessibilidade automatizada | `axe` no E2E (`e2e/a11y.spec.ts`: 12 telas × 2 temas, sem violação `serious`/`critical`); escrito na spec `0018`, executado pelo usuário com `bun run test:e2e`                                                        |
 
 ### 1.1 Baseline verificado em 2026-11-07
