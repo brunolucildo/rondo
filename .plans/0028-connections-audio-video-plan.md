@@ -60,7 +60,7 @@ Gemini (`@google/genai` 3.4.0, só em `connections/infrastructure`): upload (Blo
 
 ## Arquivos previstos
 
-Ver relatório (`apps/api/src/modules/connections/**`, `knowledge/**`, `experts/domain/grounding.ts`, `db/migrations/20261118130000_*.sql`, `apps/app/src/features/connections/**`, `experts/answer-sources.tsx`, `e2e/connections-media.spec.ts`, `.docs/*`, `.adrs/XXXX-0028-*.md`).
+Ver relatório (`apps/api/src/modules/connections/**`, `knowledge/**`, `experts/domain/grounding.ts`, `db/migrations/20261118130000_*.sql`, `apps/app/src/features/connections/**`, `experts/answer-sources.tsx`, `e2e/connections-media.spec.ts`, `.docs/*`, `.adrs/0029-gemini-para-entendimento-de-midia.md`).
 
 ## Testes
 
