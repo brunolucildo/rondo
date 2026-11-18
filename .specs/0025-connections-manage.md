@@ -145,6 +145,7 @@ Como validar que a spec foi atendida:
 | 2026-11-17 | Spec criada (rascunho) | Quebra do épico de experts (`breakdown-specs`). |
 | 2026-11-17 | Passo 8 inclui o ADR da exclusão | Auditoria: `RULES.md` §5 pede ADR para decisão de dados e retenção; nenhum requisito alterado |
 | 2026-11-17 | Implementada (status concluída; critérios marcados) | Execução do `implement-me` (orquestrada): API de listagem e exclusão, citações removidas, painel, testes, docs e ADR provisório `0026-exclusao-de-conexoes` |
+| 2026-11-18 | Decisões: excluir uma fonte mantém as respostas do histórico (citação vira "Source removed"), sem cascata; "Delete all" mais `Clear conversation` por expert atende pedidos de exclusão até existir a exclusão de conta; sem expiração automática; exclusão definitiva | Premissas de §11 confirmadas pela pessoa responsável no chat da execução orquestrada ("sim, da forma sugerida"). Não é parecer formal do Jurídico. |
 
 ### Premissas registradas na implementação
 

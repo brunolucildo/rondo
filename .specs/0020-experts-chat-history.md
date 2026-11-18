@@ -3,7 +3,7 @@
 > Spec executável. Preencha todas as seções; `TODO` é lacuna, não requisito.
 > Use `create-spec` para criar, `refine-spec` para auditar e `implement-me` para executar.
 
-- **Status:** concluída (pendente: avaliação manual com o modelo real e decisão de Produto/Jurídico sobre expiração automática)
+- **Status:** concluída (pendente: avaliação manual com o modelo real)
 - **Slug:** 0020-experts-chat-history
 - **Data:** 2026-11-17
 - **Atualizado em:** 2026-11-17
@@ -146,3 +146,4 @@ Como validar que a spec foi atendida:
 | 2026-11-17 | Spec criada (rascunho) | Quebra do épico de experts (`breakdown-specs`). |
 | 2026-11-17 | Implementada (status `concluída`); premissas de execução registradas em §11 | Execução orquestrada (`implement-me`): compensação da pergunta sem resposta, gravação antes do último evento, página única na interface |
 | 2026-11-17 | R2, R4 e R8 detalhados (validação de `limit` e `before`, respostas incompletas no contexto, remoção na mesma transação); ADR no passo 8 | Auditoria: cursor e limites sem critério de erro, ambiguidade sobre `incomplete` e atomicidade da retenção; `RULES.md` §5 pede ADR para modelo de dados |
+| 2026-11-18 | Decisão: sem expiração automática (premissa mantida) | Confirmada pela pessoa responsável no chat da execução orquestrada ("sim, da forma sugerida"). Não é parecer formal do Jurídico; revisar se a LGPD exigir prazo. |
