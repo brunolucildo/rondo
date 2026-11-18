@@ -3,10 +3,10 @@
 > Spec executável. Preencha todas as seções; `TODO` é lacuna, não requisito.
 > Use `create-spec` para criar, `refine-spec` para auditar e `implement-me` para executar.
 
-- **Status:** pronta
+- **Status:** concluída (verificação com o Gemini real pendente: sem `GEMINI_API_KEY`)
 - **Slug:** 0028-connections-audio-video
 - **Data:** 2026-11-17
-- **Atualizado em:** 2026-11-17
+- **Atualizado em:** 2026-11-18
 - **Owner:** Produto (limites, custo e textos); Time de engenharia (execução)
 - **Relacionados:** mapa `.plans/experts-breakdown.md` (fase 2); specs `0023` (pipeline, dedup, porta de extrator e chip), `0024` (busca e citações), `0025` (listar e excluir), `0022` (índice e embeddings); `.docs/ARCHITECTURE.md` §7; documentação do Gemini API sobre entendimento de vídeo e áudio. **Depende de:** 0023, 0024, 0025. **Destrava:** nenhuma spec.
 
@@ -149,4 +149,5 @@ Como validar que a spec foi atendida:
 | Data       | O que mudou            | Motivo                                                  |
 | ---------- | ---------------------- | ------------------------------------------------------- |
 | 2026-11-17 | Spec criada (rascunho) | Fase 2 do épico de experts (`breakdown-specs`).         |
+| 2026-11-18 | Implementada (`implement-me`, modo orquestrado). Premissas registradas: ID do modelo padrão `gemini-3.6-flash` (lido da documentação em 2026-11-17; `gemini-2.5-flash` consta como descontinuado; validar com chave real); janela do limite de 100 min é móvel de 24 h e os minutos são reservados no aceite num livro-razão (`connection_media_usage`) que sobrevive à exclusão; mídia `processing` fica obsoleta após 30 min (documentos, 15); pista de mídia própria no processador (concorrência 3, fila 3); o aviso de privacidade de mídia é aceito à parte do de documentos; o E2E de mídia grava a resposta citada no banco por causa do limite de 20 mensagens por minuto por IP da suíte | Execução da spec sem a pessoa; nenhuma pergunta bloqueante |
 | 2026-11-17 | R1 (duração indeterminada → `MEDIA_UNREADABLE`; limite de 50 só para conexão nova); R11 (ADR e documentação, Must) acrescentado a partir do escopo; premissa de E2E | Auditoria: MP3 de bitrate variável não tem duração confiável; o ADR estava só no escopo, sem requisito |

@@ -70,6 +70,18 @@ describe("connections module boundaries", () => {
     expect(offenders).toEqual([]);
   });
 
+  it("keeps the Gemini SDK in the one infrastructure file that wraps it", () => {
+    const offenders = sourceFiles(SRC)
+      .filter((file) => !file.endsWith(`${sep}infrastructure${sep}gemini-client.ts`))
+      .flatMap((file) =>
+        importsOf(file)
+          .filter((target) => target.startsWith("@google/"))
+          .map((target) => shown(SRC, file, target)),
+      );
+
+    expect(offenders).toEqual([]);
+  });
+
   it("never reaches for the Weaviate packages (the index is only used through the knowledge port)", () => {
     const offenders = sourceFiles(CONNECTIONS_MODULE).flatMap((file) =>
       importsOf(file)

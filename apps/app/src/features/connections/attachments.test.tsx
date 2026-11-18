@@ -100,7 +100,7 @@ describe("the Add connection button (R1)", () => {
 
     const button = screen.getByRole("button", { name: "Add connection" });
 
-    expect(fileInput()).toHaveAttribute("accept", ".pdf,.txt,.md");
+    expect(fileInput()).toHaveAttribute("accept", ".pdf,.txt,.md,.mp3,.mp4");
 
     const clicked = vi.spyOn(fileInput(), "click");
 
@@ -269,7 +269,7 @@ describe("failures (R8)", () => {
     await user.upload(fileInput(), pdf("fake.pdf"));
 
     expect(
-      await screen.findByText("Only PDF, TXT and Markdown files are supported."),
+      await screen.findByText("Only PDF, TXT, Markdown, MP3 and MP4 files are supported."),
     ).toBeInTheDocument();
   });
 

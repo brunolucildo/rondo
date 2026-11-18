@@ -149,6 +149,53 @@ describe("the panel of connections (R8)", () => {
     expect(other).toHaveTextContent("Markdown · 2.0 MB · Ready · Nov 16, 2026");
   });
 
+  it("shows the type and the duration of an audio and a video (spec 0028)", async () => {
+    stubApi(
+      serverWith([
+        connection({ id: FIRST_ID, name: "analysis.mp4", kind: "video", durationSeconds: 750 }),
+        connection({ id: SECOND_ID, name: "talk.mp3", kind: "audio", durationSeconds: 3723 }),
+      ]),
+    );
+
+    const user = userEvent.setup();
+    const panel = await openPanel(user);
+    const list = await within(panel).findByRole("list", { name: "Your connections" });
+    const [video, audio] = within(list).getAllByRole("listitem");
+
+    expect(video).toHaveTextContent("Video · 1 KB · 12:30 · Ready · Nov 17, 2026");
+    expect(audio).toHaveTextContent("Audio · 1 KB · 1:02:03 · Ready · Nov 17, 2026");
+  });
+
+  it("explains a silent media and an unreadable one with words that fit audio and video", async () => {
+    stubApi(
+      serverWith([
+        connection({
+          id: FIRST_ID,
+          kind: "video",
+          name: "quiet.mp4",
+          status: "failed",
+          errorCode: "NO_EXTRACTABLE_TEXT",
+        }),
+        connection({
+          id: SECOND_ID,
+          kind: "audio",
+          name: "broken.mp3",
+          status: "failed",
+          errorCode: "MEDIA_UNREADABLE",
+        }),
+      ]),
+    );
+
+    const user = userEvent.setup();
+    const panel = await openPanel(user);
+
+    expect(
+      await within(panel).findByText(/couldn't find any speech or content/),
+    ).toBeInTheDocument();
+    expect(within(panel).queryByText(/Scanned PDFs/)).not.toBeInTheDocument();
+    expect(within(panel).getByText(/couldn't read this audio or video/)).toBeInTheDocument();
+  });
+
   it("explains why a connection failed", async () => {
     stubApi(serverWith([connection({ status: "failed", errorCode: "PDF_PROTECTED" })]));
 

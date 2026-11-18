@@ -11,8 +11,11 @@ import type { DocumentExtractor, ExtractedSection } from "../domain/connection-p
 
 type LoaderFactory = (filePath: string) => BaseDocumentLoader;
 
+/** The kinds this extractor reads from disk with the LangChain loaders (audio and video go to Gemini). */
+export type DocumentKind = Exclude<ConnectionKind, "audio" | "video">;
+
 /** One loader per kind: TXT and Markdown are plain text; PDF goes through `pdf-parse`. */
-const LOADERS: Readonly<Record<ConnectionKind, LoaderFactory>> = {
+const LOADERS: Readonly<Record<DocumentKind, LoaderFactory>> = {
   pdf: (filePath) => new PDFLoader(filePath, { splitPages: true }),
   txt: (filePath) => new TextLoader(filePath),
   md: (filePath) => new TextLoader(filePath),
@@ -41,7 +44,7 @@ const PAGE_NUMBER = (metadata: Record<string, unknown>): number | undefined => {
   return undefined;
 };
 
-function classify(kind: ConnectionKind, error: unknown): unknown {
+function classify(kind: DocumentKind, error: unknown): unknown {
   if (kind !== "pdf" || typeof error !== "object" || error === null || !("name" in error)) {
     return error;
   }
@@ -65,7 +68,7 @@ function classify(kind: ConnectionKind, error: unknown): unknown {
  */
 export class LangChainDocumentExtractor implements DocumentExtractor {
   constructor(
-    private readonly kind: ConnectionKind,
+    private readonly kind: DocumentKind,
     private readonly workRoot: string = tmpdir(),
   ) {}
 

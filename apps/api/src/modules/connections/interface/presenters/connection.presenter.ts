@@ -10,6 +10,8 @@ export interface ConnectionResponse {
   name: string;
   kind: ConnectionKind;
   sizeBytes: number;
+  /** Seconds of an audio or video; `null` for the other kinds. */
+  durationSeconds: number | null;
   status: ConnectionStatus;
   chunkCount: number;
   errorCode: ConnectionErrorCode | null;
@@ -23,6 +25,7 @@ export function presentConnection(connection: Connection): ConnectionResponse {
     name: connection.name,
     kind: connection.kind,
     sizeBytes: connection.sizeBytes,
+    durationSeconds: connection.durationSeconds ?? null,
     status: connection.status,
     chunkCount: connection.chunkCount,
     errorCode: connection.errorCode,

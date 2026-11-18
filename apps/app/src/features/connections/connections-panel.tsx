@@ -8,6 +8,7 @@ import {
   describeDeleteFailure,
   describeProcessingFailure,
   formatSize,
+  formatTimestamp,
   kindLabel,
   statusLabel,
 } from "./connection-messages";
@@ -45,7 +46,9 @@ interface ConnectionRowProps {
 
 function ConnectionRow({ connection, disabled, onDelete }: ConnectionRowProps) {
   const failure =
-    connection.status === "failed" ? describeProcessingFailure(connection.errorCode).text : null;
+    connection.status === "failed"
+      ? describeProcessingFailure(connection.errorCode, connection.kind).text
+      : null;
 
   return (
     <li className="flex flex-col gap-2 rounded-md border-2 border-border bg-background p-3 sm:flex-row sm:items-center">
@@ -55,6 +58,9 @@ function ConnectionRow({ connection, disabled, onDelete }: ConnectionRowProps) {
         </p>
         <p className="text-sm text-muted-foreground">
           {kindLabel(connection.kind)} · {formatSize(connection.sizeBytes)} ·{" "}
+          {connection.durationSeconds == null
+            ? null
+            : `${formatTimestamp(connection.durationSeconds)} · `}
           {statusLabel(connection.status)} ·{" "}
           <time dateTime={connection.createdAt}>{formatDate(connection.createdAt)}</time>
         </p>

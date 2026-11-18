@@ -1,5 +1,6 @@
 import { YellowCardIcon } from "@repo/ui/icons";
 import { useId } from "react";
+import { formatTimestamp } from "../connections/connection-messages";
 import { useRemovedConnectionIds } from "../connections/use-attachments";
 import type { AnswerCitation, Citation } from "./chat-state";
 
@@ -10,6 +11,11 @@ export const NO_SOURCE_NOTICE = "No connected source covers this.";
 export const SOURCE_REMOVED = "Source removed";
 
 function sourceLabel(citation: Citation): string {
+  // An audio or a video says the instant the passage starts: "analysis.mp4 · 12:30".
+  if (citation.startSeconds !== undefined) {
+    return `${citation.sourceName} · ${formatTimestamp(citation.startSeconds)}`;
+  }
+
   return citation.page === null
     ? citation.sourceName
     : `${citation.sourceName}, page ${citation.page}`;
@@ -33,7 +39,7 @@ function sourceLines(
       }
     } else {
       lines.push({
-        key: `${citation.connectionId}-${citation.page ?? "none"}`,
+        key: `${citation.connectionId}-${citation.page ?? "none"}-${citation.startSeconds ?? "none"}`,
         text: sourceLabel(citation),
       });
     }

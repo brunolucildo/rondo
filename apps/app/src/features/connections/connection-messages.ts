@@ -1,17 +1,37 @@
 import { ApiError } from "../../lib/api-client";
 
-/** Largest file the API accepts. Checked here too so a big file is not uploaded for nothing. */
+/** Largest document the API accepts. Checked here too so a big file is not uploaded for nothing. */
 export const MAX_FILE_BYTES = 20 * 1024 * 1024;
 
-export const ACCEPTED_EXTENSIONS = [".pdf", ".txt", ".md"] as const;
+/** Largest audio and video (spec 0028): MP3 50 MB, MP4 200 MB. */
+export const MAX_AUDIO_BYTES = 50 * 1024 * 1024;
+export const MAX_VIDEO_BYTES = 200 * 1024 * 1024;
+
+export const ACCEPTED_EXTENSIONS = [".pdf", ".txt", ".md", ".mp3", ".mp4"] as const;
+
+const SUPPORTED_TYPES_TEXT = "Only PDF, TXT, Markdown, MP3 and MP4 files are supported.";
+
+export type MediaKind = "audio" | "video";
+
+/** `audio` for an `.mp3`, `video` for an `.mp4`, `null` for anything else (a document). */
+export function mediaKindOfFile(file: Pick<File, "name">): MediaKind | null {
+  const name = file.name.toLowerCase();
+
+  return name.endsWith(".mp3") ? "audio" : name.endsWith(".mp4") ? "video" : null;
+}
+
+/** At most this many audio or video files are sent and processed at once (the server allows 2). */
+export const MAX_SIMULTANEOUS_MEDIA = 2;
 
 export type ConnectionStatus = "processing" | "ready" | "failed";
 
 export interface ConnectionDto {
   id: string;
   name: string;
-  kind: "pdf" | "txt" | "md";
+  kind: "pdf" | "txt" | "md" | "audio" | "video";
   sizeBytes: number;
+  /** Seconds of an audio or video; `null` for the other kinds. */
+  durationSeconds?: number | null;
   status: ConnectionStatus;
   chunkCount: number;
   errorCode: string | null;
@@ -42,6 +62,20 @@ const BY_PROCESSING_CODE: Record<string, FailureMessage> = {
     text: "We couldn't process this file right now. Try again in a moment.",
     retryable: true,
   },
+  MEDIA_UNREADABLE: {
+    text: "We couldn't read this audio or video. Export it again as MP3 or MP4 and try again.",
+    retryable: false,
+  },
+  CONTENT_NOT_PROCESSABLE: {
+    text: "The provider refused to process this content. Try another file.",
+    retryable: false,
+  },
+};
+
+/** A silent audio or a video with nothing to say or show: the PDF text would be wrong for it. */
+const NO_TEXT_IN_MEDIA: FailureMessage = {
+  text: "We couldn't find any speech or content in this audio or video.",
+  retryable: false,
 };
 
 const GENERIC: FailureMessage = {
@@ -50,7 +84,14 @@ const GENERIC: FailureMessage = {
 };
 
 /** The fixed message of a `failed` connection, by the code the API gives. */
-export function describeProcessingFailure(errorCode: string | null): FailureMessage {
+export function describeProcessingFailure(
+  errorCode: string | null,
+  kind?: ConnectionDto["kind"],
+): FailureMessage {
+  if (errorCode === "NO_EXTRACTABLE_TEXT" && (kind === "audio" || kind === "video")) {
+    return NO_TEXT_IN_MEDIA;
+  }
+
   return (errorCode === null ? undefined : BY_PROCESSING_CODE[errorCode]) ?? GENERIC;
 }
 
@@ -62,9 +103,34 @@ export function describeUploadFailure(error: unknown): FailureMessage {
 
   switch (error.code) {
     case "UNSUPPORTED_FILE":
-      return { text: "Only PDF, TXT and Markdown files are supported.", retryable: false };
+      return { text: SUPPORTED_TYPES_TEXT, retryable: false };
     case "FILE_TOO_LARGE":
-      return { text: "Files can have at most 20 MB.", retryable: false };
+      return {
+        text: "This file is too large. Documents can have at most 20 MB, MP3 50 MB and MP4 200 MB.",
+        retryable: false,
+      };
+    case "MEDIA_TOO_LONG":
+      return {
+        text: "Audio can have at most 60 minutes and video at most 20 minutes.",
+        retryable: false,
+      };
+    case "MEDIA_UNREADABLE":
+      return {
+        text: "We couldn't read the length of this file. Export it again and try again.",
+        retryable: false,
+      };
+    case "TOO_MANY_PROCESSING":
+      return {
+        text: "You already have 2 audio or video files being processed. Wait for one to finish.",
+        retryable: true,
+      };
+    case "MEDIA_DAILY_LIMIT":
+      return {
+        text: "You reached the daily limit of 100 minutes of audio and video. Try again tomorrow.",
+        retryable: false,
+      };
+    case "MEDIA_UNAVAILABLE":
+      return { text: "Audio and video are not available right now.", retryable: true };
     case "EMPTY_FILE":
       return { text: "This file is empty.", retryable: false };
     case "CONNECTION_LIMIT_REACHED":
@@ -86,14 +152,24 @@ export function checkFileBeforeUpload(file: File): FailureMessage | null {
   const name = file.name.toLowerCase();
 
   if (!ACCEPTED_EXTENSIONS.some((extension) => name.endsWith(extension))) {
-    return { text: "Only PDF, TXT and Markdown files are supported.", retryable: false };
+    return { text: SUPPORTED_TYPES_TEXT, retryable: false };
   }
 
   if (file.size === 0) {
     return { text: "This file is empty.", retryable: false };
   }
 
-  if (file.size > MAX_FILE_BYTES) {
+  const media = mediaKindOfFile(file);
+
+  if (media === "audio" && file.size > MAX_AUDIO_BYTES) {
+    return { text: "MP3 files can have at most 50 MB.", retryable: false };
+  }
+
+  if (media === "video" && file.size > MAX_VIDEO_BYTES) {
+    return { text: "MP4 files can have at most 200 MB.", retryable: false };
+  }
+
+  if (media === null && file.size > MAX_FILE_BYTES) {
     return { text: "Files can have at most 20 MB.", retryable: false };
   }
 
@@ -133,6 +209,8 @@ const KIND_LABEL: Record<ConnectionDto["kind"], string> = {
   pdf: "PDF",
   txt: "TXT",
   md: "Markdown",
+  audio: "Audio",
+  video: "Video",
 };
 
 export const kindLabel = (kind: ConnectionDto["kind"]): string => KIND_LABEL[kind];
@@ -157,3 +235,15 @@ const STATUS_TEXT: Record<ConnectionStatus, string> = {
 };
 
 export const statusLabel = (status: ConnectionStatus): string => STATUS_TEXT[status];
+
+/** `750` is "12:30"; an hour or more reads "1:02:03". How the interface shows a time of a media. */
+export function formatTimestamp(totalSeconds: number): string {
+  const seconds = Math.max(0, Math.floor(totalSeconds));
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const rest = String(seconds % 60).padStart(2, "0");
+
+  return hours > 0
+    ? `${hours}:${String(minutes).padStart(2, "0")}:${rest}`
+    : `${String(minutes).padStart(2, "0")}:${rest}`;
+}
