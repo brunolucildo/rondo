@@ -135,7 +135,7 @@ test.describe("Connections: text files", () => {
     await attach(page, "fake.pdf", "application/pdf", Buffer.from("MZ this is not a pdf"));
 
     await expect(
-      page.getByText("Only PDF, TXT, Markdown, JPG and PNG files are supported."),
+      page.getByText("Only PDF, TXT, Markdown, JPG, PNG, MP3 and MP4 files are supported."),
     ).toBeVisible();
   });
 

@@ -8,7 +8,7 @@ import type {
   ConnectionTelemetry,
   DeletionOutcome,
 } from "../../domain/connection-ports";
-import { STALE_PROCESSING_MS } from "../../domain/connection-rules";
+import { STALE_MEDIA_PROCESSING_MS, STALE_PROCESSING_MS } from "../../domain/connection-rules";
 
 export interface DeleteAllConnectionsInput {
   /** From the session, never from the request. */
@@ -56,8 +56,9 @@ export class DeleteAllConnections {
 
   private async run(userId: string): Promise<void> {
     const staleBefore = new Date(this.now().getTime() - STALE_PROCESSING_MS);
+    const mediaStaleBefore = new Date(this.now().getTime() - STALE_MEDIA_PROCESSING_MS);
 
-    if (await this.repository.hasActiveProcessing(userId, staleBefore)) {
+    if (await this.repository.hasActiveProcessing(userId, staleBefore, mediaStaleBefore)) {
       throw new ConnectionBusyError();
     }
 
@@ -69,6 +70,6 @@ export class DeleteAllConnections {
         : error;
     }
 
-    await this.repository.deleteAllSettled(userId, staleBefore);
+    await this.repository.deleteAllSettled(userId, staleBefore, mediaStaleBefore);
   }
 }

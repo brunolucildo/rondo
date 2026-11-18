@@ -8,6 +8,8 @@ export interface KnowledgeChunk {
   position: number;
   /** One-based page, when the source has pages. */
   page?: number;
+  /** Second of the audio or video the chunk starts at (spec 0028), when the source has a timeline. */
+  startSeconds?: number;
   text: string;
   /** Embedding of `text`, computed by the application (never by the index). */
   vector: readonly number[];
@@ -18,6 +20,7 @@ export interface KnowledgeSearchHit {
   sourceName: string;
   position: number;
   page?: number;
+  startSeconds?: number;
   text: string;
   /** Cosine similarity to the query, from -1 to 1 (higher is closer). */
   score: number;

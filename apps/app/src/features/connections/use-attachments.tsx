@@ -4,6 +4,7 @@ import {
   type ReactNode,
   useCallback,
   useContext,
+  useEffect,
   useReducer,
   useRef,
   useState,
@@ -16,15 +17,23 @@ import {
   describeProcessingFailure,
   describeUploadFailure,
   type FailureMessage,
+  MAX_SIMULTANEOUS_MEDIA,
+  mediaKindOfFile,
 } from "./connection-messages";
 import { PrivacyNotice } from "./privacy-notice";
 
 const PRIVACY_KEY = "rondo.connections.privacy-accepted";
+/** Audio and video also go to Gemini (spec 0028): the person accepts that notice separately. */
+const PRIVACY_MEDIA_KEY = "rondo.connections.privacy-media-accepted";
 const POLL_START_MS = 1000;
 const POLL_STEP_MS = 500;
 const POLL_MAX_MS = 5000;
+/** A media takes minutes: the wait between two checks grows from 2 s to 15 s. */
+const MEDIA_POLL_START_MS = 2000;
+const MEDIA_POLL_STEP_MS = 1000;
+const MEDIA_POLL_MAX_MS = 15_000;
 
-export type AttachmentPhase = "uploading" | "processing" | "ready" | "failed";
+export type AttachmentPhase = "waiting" | "uploading" | "processing" | "ready" | "failed";
 
 export interface AttachmentView {
   id: string;
@@ -34,11 +43,17 @@ export interface AttachmentView {
   message: string | null;
   /** True when sending the same file again can work. */
   canRetry: boolean;
+  /** An audio or a video: it takes minutes and waits for its turn (at most 2 at a time). */
+  media: boolean;
 }
 
 interface Attachment {
   id: string;
   file: File;
+  /** False while a media waits for a free slot (at most 2 media are sent at once). */
+  started: boolean;
+  /** Counts the times the file was sent again, so a start is never done twice. */
+  attempt: number;
   /** Set once the API answered; the status is then followed by polling. */
   connectionId: string | null;
   /** Why the upload itself was refused or failed. */
@@ -49,6 +64,7 @@ interface Attachment {
 
 type Action =
   | { type: "added"; attachment: Attachment }
+  | { type: "started"; id: string }
   | { type: "sent"; id: string; connectionId: string }
   | { type: "rejected"; id: string; rejection: FailureMessage }
   | { type: "restarted"; id: string }
@@ -62,6 +78,8 @@ function reducer(state: readonly Attachment[], action: Action): Attachment[] {
   switch (action.type) {
     case "added":
       return [...state, action.attachment];
+    case "started":
+      return state.map((item) => (item.id === action.id ? { ...item, started: true } : item));
     case "sent":
       return state.map((item) =>
         item.id === action.id
@@ -75,7 +93,15 @@ function reducer(state: readonly Attachment[], action: Action): Attachment[] {
     case "restarted":
       return state.map((item) =>
         item.id === action.id
-          ? { ...item, connectionId: null, rejection: null, problem: null }
+          ? {
+              ...item,
+              connectionId: null,
+              rejection: null,
+              problem: null,
+              attempt: item.attempt + 1,
+              // A document is sent again at once; a media goes back to the line for a slot.
+              started: mediaKindOfFile(item.file) === null,
+            }
           : item,
       );
     case "flagged":
@@ -98,17 +124,21 @@ const PROBLEM_TEXT = {
   "not-ready": "This file is not ready yet. Remove it or wait a moment and try again.",
 } as const;
 
-function readPrivacyAccepted(): boolean {
+function readPrivacyAccepted(media: boolean): boolean {
   try {
-    return window.localStorage.getItem(PRIVACY_KEY) === "true";
+    return window.localStorage.getItem(media ? PRIVACY_MEDIA_KEY : PRIVACY_KEY) === "true";
   } catch {
     return false;
   }
 }
 
-function rememberPrivacyAccepted(): void {
+function rememberPrivacyAccepted(media: boolean): void {
   try {
     window.localStorage.setItem(PRIVACY_KEY, "true");
+
+    if (media) {
+      window.localStorage.setItem(PRIVACY_MEDIA_KEY, "true");
+    }
   } catch {
     // The notice then shows again next time; nothing else depends on it.
   }
@@ -126,9 +156,16 @@ function connectionQuery(connectionId: string) {
     }) => {
       const status = query.state.data?.status;
 
-      return status === "ready" || status === "failed"
-        ? false
-        : Math.min(POLL_START_MS + POLL_STEP_MS * query.state.dataUpdateCount, POLL_MAX_MS);
+      if (status === "ready" || status === "failed") {
+        return false;
+      }
+
+      const kind = query.state.data?.kind;
+      const count = query.state.dataUpdateCount;
+
+      return kind === "audio" || kind === "video"
+        ? Math.min(MEDIA_POLL_START_MS + MEDIA_POLL_STEP_MS * count, MEDIA_POLL_MAX_MS)
+        : Math.min(POLL_START_MS + POLL_STEP_MS * count, POLL_MAX_MS);
     },
   };
 }
@@ -162,7 +199,11 @@ const AttachmentsContext = createContext<AttachmentsContextValue | null>(null);
 const NO_REMOVED_CONNECTIONS: ReadonlySet<string> = new Set();
 
 function viewOf(item: Attachment, connection: ConnectionDto | undefined): AttachmentView {
-  const base = { id: item.id, name: item.file.name };
+  const base = {
+    id: item.id,
+    name: item.file.name,
+    media: mediaKindOfFile(item.file) !== null,
+  };
 
   if (item.rejection !== null) {
     return {
@@ -175,6 +216,10 @@ function viewOf(item: Attachment, connection: ConnectionDto | undefined): Attach
 
   if (item.problem !== null) {
     return { ...base, phase: "failed", message: item.problem, canRetry: false };
+  }
+
+  if (!item.started) {
+    return { ...base, phase: "waiting", message: null, canRetry: false };
   }
 
   if (item.connectionId === null) {
@@ -205,6 +250,8 @@ export function AttachmentsProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const [items, dispatch] = useReducer(reducer, []);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
+  /** Starts already done (`id#attempt`), so the effect below never sends a file twice. */
+  const startedKeys = useRef(new Set<string>());
   const [removedConnectionIds, setRemovedConnectionIds] = useState<ReadonlySet<string>>(new Set());
   const counter = useRef(0);
   const { mutateAsync } = useMutation({
@@ -244,12 +291,23 @@ export function AttachmentsProvider({ children }: { children: ReactNode }) {
       const id = `attachment-${counter.current}`;
       const refusal = checkFileBeforeUpload(file);
 
+      const waitsForATurn = refusal === null && mediaKindOfFile(file) !== null;
+
       dispatch({
         type: "added",
-        attachment: { id, file, connectionId: null, rejection: refusal, problem: null },
+        attachment: {
+          id,
+          file,
+          started: !waitsForATurn,
+          attempt: 0,
+          connectionId: null,
+          rejection: refusal,
+          problem: null,
+        },
       });
 
-      if (refusal === null) {
+      // A media waits in line for one of the slots (see the effect below); a document goes now.
+      if (refusal === null && !waitsForATurn) {
         void send(id, file);
       }
     },
@@ -258,7 +316,7 @@ export function AttachmentsProvider({ children }: { children: ReactNode }) {
 
   const addFile = useCallback(
     (file: File) => {
-      if (readPrivacyAccepted()) {
+      if (readPrivacyAccepted(mediaKindOfFile(file) !== null)) {
         start(file);
       } else {
         setPendingFile(file);
@@ -279,6 +337,40 @@ export function AttachmentsProvider({ children }: { children: ReactNode }) {
     [queryClient],
   );
 
+  // At most 2 audio or video files are in flight (uploading or processing) at once; the others
+  // wait their turn here, in the order they were added. The server also enforces it (409).
+  const mediaInFlight = items.filter(
+    (item, position) =>
+      mediaKindOfFile(item.file) !== null &&
+      item.started &&
+      (views[position]?.phase === "uploading" || views[position]?.phase === "processing"),
+  ).length;
+
+  useEffect(() => {
+    let free = MAX_SIMULTANEOUS_MEDIA - mediaInFlight;
+
+    for (const item of items) {
+      const key = `${item.id}#${item.attempt}`;
+
+      if (free <= 0) {
+        return;
+      }
+
+      if (
+        !item.started &&
+        item.rejection === null &&
+        item.problem === null &&
+        mediaKindOfFile(item.file) !== null &&
+        !startedKeys.current.has(key)
+      ) {
+        startedKeys.current.add(key);
+        free -= 1;
+        dispatch({ type: "started", id: item.id });
+        void send(item.id, item.file);
+      }
+    }
+  }, [items, mediaInFlight, send]);
+
   const value: AttachmentsContextValue = {
     attachments: views,
     removedConnectionIds,
@@ -287,7 +379,10 @@ export function AttachmentsProvider({ children }: { children: ReactNode }) {
     // silently widen the search to the whole base.
     isBusy:
       items.some((item) => item.problem !== null) ||
-      views.some((view) => view.phase === "uploading" || view.phase === "processing"),
+      views.some(
+        (view) =>
+          view.phase === "waiting" || view.phase === "uploading" || view.phase === "processing",
+      ),
     addFile,
     removeAttachment: (id) => dispatch({ type: "removed", id }),
     retryAttachment: (id) => {
@@ -295,7 +390,11 @@ export function AttachmentsProvider({ children }: { children: ReactNode }) {
 
       if (item !== undefined) {
         dispatch({ type: "restarted", id });
-        void send(id, item.file);
+
+        // A media goes back to the line (the effect starts it when a slot is free).
+        if (mediaKindOfFile(item.file) === null) {
+          void send(id, item.file);
+        }
       }
     },
     readyConnectionIds: [
@@ -327,8 +426,9 @@ export function AttachmentsProvider({ children }: { children: ReactNode }) {
       {children}
       {pendingFile === null ? null : (
         <PrivacyNotice
+          media={mediaKindOfFile(pendingFile) !== null}
           onAccept={() => {
-            rememberPrivacyAccepted();
+            rememberPrivacyAccepted(mediaKindOfFile(pendingFile) !== null);
             start(pendingFile);
             setPendingFile(null);
           }}

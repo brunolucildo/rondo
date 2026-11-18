@@ -5,10 +5,21 @@ import type {
   InsertedConnection,
   NewConnection,
 } from "../domain/connection-ports";
+import { isMediaKind } from "../domain/connection-rules";
 
-/** Being processed right now: `processing` and not older than the stale cutoff. */
-const isActiveProcessing = (row: Connection, staleBefore: Date): boolean =>
-  row.status === "processing" && row.updatedAt >= staleBefore;
+const DAY_MS = 24 * 60 * 60_000;
+
+/**
+ * Being processed right now: `processing` and not older than the stale cutoff (the later one for
+ * an audio or a video).
+ */
+const isActiveProcessing = (
+  row: Connection,
+  staleBefore: Date,
+  mediaStaleBefore: Date = staleBefore,
+): boolean =>
+  row.status === "processing" &&
+  row.updatedAt >= (isMediaKind(row.kind) ? mediaStaleBefore : staleBefore);
 
 /**
  * `ConnectionRepository` in memory, with the same semantics as the Postgres one (unique
@@ -16,6 +27,8 @@ const isActiveProcessing = (row: Connection, staleBefore: Date): boolean =>
  */
 export class InMemoryConnectionRepository implements ConnectionRepository {
   readonly rows = new Map<string, Connection>();
+  /** Seconds of media booked per user (the ledger of the daily limit). */
+  readonly mediaUsage: { userId: string; seconds: number; at: Date }[] = [];
 
   constructor(private readonly now: () => Date = () => new Date()) {}
 
@@ -58,6 +71,7 @@ export class InMemoryConnectionRepository implements ConnectionRepository {
       id: randomUUID(),
       userId,
       ...connection,
+      durationSeconds: connection.durationSeconds ?? null,
       status: "processing",
       chunkCount: 0,
       errorCode: null,
@@ -133,29 +147,38 @@ export class InMemoryConnectionRepository implements ConnectionRepository {
     );
   }
 
-  hasActiveProcessing(userId: string, staleBefore: Date): Promise<boolean> {
+  hasActiveProcessing(
+    userId: string,
+    staleBefore: Date,
+    mediaStaleBefore?: Date,
+  ): Promise<boolean> {
     return Promise.resolve(
       [...this.rows.values()].some(
-        (row) => row.userId === userId && isActiveProcessing(row, staleBefore),
+        (row) => row.userId === userId && isActiveProcessing(row, staleBefore, mediaStaleBefore),
       ),
     );
   }
 
-  deleteSettled(userId: string, connectionId: string, staleBefore: Date): Promise<boolean> {
+  deleteSettled(
+    userId: string,
+    connectionId: string,
+    staleBefore: Date,
+    mediaStaleBefore?: Date,
+  ): Promise<boolean> {
     const row = this.rows.get(connectionId);
 
-    if (row?.userId !== userId || isActiveProcessing(row, staleBefore)) {
+    if (row?.userId !== userId || isActiveProcessing(row, staleBefore, mediaStaleBefore)) {
       return Promise.resolve(false);
     }
 
     return Promise.resolve(this.rows.delete(connectionId));
   }
 
-  deleteAllSettled(userId: string, staleBefore: Date): Promise<number> {
+  deleteAllSettled(userId: string, staleBefore: Date, mediaStaleBefore?: Date): Promise<number> {
     let deleted = 0;
 
     for (const [id, row] of this.rows) {
-      if (row.userId === userId && !isActiveProcessing(row, staleBefore)) {
+      if (row.userId === userId && !isActiveProcessing(row, staleBefore, mediaStaleBefore)) {
         this.rows.delete(id);
         deleted += 1;
       }
@@ -168,5 +191,30 @@ export class InMemoryConnectionRepository implements ConnectionRepository {
     return Promise.resolve(
       [...new Set(connectionIds)].filter((id) => this.rows.get(id)?.userId === userId),
     );
+  }
+
+  countActiveMedia(userId: string, staleBefore: Date): Promise<number> {
+    return Promise.resolve(
+      [...this.rows.values()].filter(
+        (row) =>
+          row.userId === userId && isMediaKind(row.kind) && isActiveProcessing(row, staleBefore),
+      ).length,
+    );
+  }
+
+  reserveMediaSeconds(userId: string, seconds: number, maxSecondsPerDay: number): Promise<boolean> {
+    const now = this.now();
+    const since = now.getTime() - DAY_MS;
+    const used = this.mediaUsage
+      .filter((entry) => entry.userId === userId && entry.at.getTime() > since)
+      .reduce((total, entry) => total + entry.seconds, 0);
+
+    if (used + seconds > maxSecondsPerDay) {
+      return Promise.resolve(false);
+    }
+
+    this.mediaUsage.push({ userId, seconds, at: now });
+
+    return Promise.resolve(true);
   }
 }

@@ -1,5 +1,8 @@
-/** Kinds of connection this slice can ingest. URLs, audio and video come in phase 2. */
-export const CONNECTION_KINDS = ["pdf", "txt", "md", "image"] as const;
+/**
+ * Kinds of connection this slice can ingest. Images go through the vision port (spec 0026), audio
+ * and video through the media understanding port (spec 0028). URLs come later.
+ */
+export const CONNECTION_KINDS = ["pdf", "txt", "md", "image", "audio", "video"] as const;
 
 export type ConnectionKind = (typeof CONNECTION_KINDS)[number];
 
@@ -11,6 +14,7 @@ export const CONNECTION_ERROR_CODES = [
   "PDF_PROTECTED",
   "TOO_MANY_CHUNKS",
   "PROCESSING_UNAVAILABLE",
+  "MEDIA_UNREADABLE",
   "CONTENT_NOT_PROCESSABLE",
 ] as const;
 
@@ -23,6 +27,8 @@ export interface Connection {
   /** The user's own file name: shown back to them, never logged. */
   name: string;
   sizeBytes: number;
+  /** Length of an audio or video, read from its metadata; `null` for the other kinds. */
+  durationSeconds?: number | null;
   /** SHA-256 of the bytes (lower-case hex): the identity of the content. Never logged. */
   contentHash: string;
   status: ConnectionStatus;

@@ -5,6 +5,8 @@ export interface NewConnection {
   kind: ConnectionKind;
   name: string;
   sizeBytes: number;
+  /** Length of an audio or video, read from its metadata (spec 0028). */
+  durationSeconds?: number | null;
   contentHash: string;
 }
 
@@ -39,23 +41,43 @@ export interface ConnectionRepository {
   markFailed(userId: string, connectionId: string, errorCode: ConnectionErrorCode): Promise<void>;
   /** Every connection of the user, the most recent first. */
   listByUser(userId: string): Promise<Connection[]>;
-  /** True when the user has a connection being processed that is not stale (`updatedAt >= staleBefore`). */
-  hasActiveProcessing(userId: string, staleBefore: Date): Promise<boolean>;
+  /**
+   * True when the user has a connection being processed that is not stale (`updatedAt >=
+   * staleBefore`). Audio and video go stale later: `mediaStaleBefore` (defaults to `staleBefore`).
+   */
+  hasActiveProcessing(userId: string, staleBefore: Date, mediaStaleBefore?: Date): Promise<boolean>;
   /**
    * Deletes the row of one connection of the user unless it is being processed right now (not
    * stale). Returns whether a row was deleted. The deduplication identity goes with the row.
    */
-  deleteSettled(userId: string, connectionId: string, staleBefore: Date): Promise<boolean>;
+  deleteSettled(
+    userId: string,
+    connectionId: string,
+    staleBefore: Date,
+    mediaStaleBefore?: Date,
+  ): Promise<boolean>;
   /** Deletes every row of the user except the ones being processed right now. Returns the count. */
-  deleteAllSettled(userId: string, staleBefore: Date): Promise<number>;
+  deleteAllSettled(userId: string, staleBefore: Date, mediaStaleBefore?: Date): Promise<number>;
   /** The ids, among `connectionIds`, that are still connections of the user. */
   findExistingIds(userId: string, connectionIds: readonly string[]): Promise<string[]>;
+  /** Audio and video of the user being processed right now (not stale: `updatedAt >= staleBefore`). */
+  countActiveMedia(userId: string, staleBefore: Date): Promise<number>;
+  /**
+   * Books `seconds` of media processing in the user's rolling 24 hours (spec 0028, R10) unless the
+   * day's total would pass `maxSecondsPerDay`. Returns whether it was booked. The ledger outlives
+   * the connection: deleting a media does not give the minutes back.
+   */
+  reserveMediaSeconds(userId: string, seconds: number, maxSecondsPerDay: number): Promise<boolean>;
 }
 
-/** One piece of extracted text, with its page when the source has pages (one-based). */
+/**
+ * One piece of extracted text, with its page when the source has pages (one-based) or the second
+ * it starts at when the source is an audio or a video.
+ */
 export interface ExtractedSection {
   text: string;
   page?: number;
+  startSeconds?: number;
 }
 
 /**
@@ -99,6 +121,8 @@ export interface IngestionResult {
   reason: "none" | Lowercase<ConnectionErrorCode>;
   deduplicated: boolean;
   chunkCount: number;
+  /** Seconds of audio or video processed; absent for the other kinds. Telemetry derives the cost per minute. */
+  mediaSeconds?: number;
 }
 
 /** `single`: one connection; `all`: every connection of the user. */

@@ -9,8 +9,11 @@ import type { ConnectionKind } from "../domain/connection";
 import { ConnectionProcessingError } from "../domain/connection-errors";
 import type { DocumentExtractor, ExtractedSection } from "../domain/connection-ports";
 
-/** The kinds read by a document loader; images go through `ImageDocumentExtractor`. */
-export type LoaderKind = Exclude<ConnectionKind, "image">;
+/**
+ * The kinds read by a document loader; images go through `ImageDocumentExtractor` and audio and
+ * video through `MediaDocumentExtractor`.
+ */
+export type LoaderKind = Exclude<ConnectionKind, "image" | "audio" | "video">;
 
 type LoaderFactory = (filePath: string) => BaseDocumentLoader;
 

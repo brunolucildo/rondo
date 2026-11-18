@@ -129,7 +129,7 @@ test.describe("Connections: images", () => {
     await attach(page, "anim.png", "image/png", Buffer.from("GIF89a\u0001\u0000\u0001\u0000 data"));
 
     await expect(
-      page.getByText("Only PDF, TXT, Markdown, JPG and PNG files are supported."),
+      page.getByText("Only PDF, TXT, Markdown, JPG, PNG, MP3 and MP4 files are supported."),
     ).toBeVisible();
   });
 

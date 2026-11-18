@@ -91,7 +91,7 @@ afterEach(() => {
 });
 
 describe("the Add connection button (R1)", () => {
-  it("is a button reachable by keyboard that opens the file picker for PDF, TXT, Markdown, JPG and PNG", async () => {
+  it("is a button reachable by keyboard that opens the file picker for PDF, TXT, Markdown, JPG, PNG, MP3 and MP4", async () => {
     stubApi(() => jsonResponse(500, {}));
 
     const user = userEvent.setup();
@@ -100,7 +100,7 @@ describe("the Add connection button (R1)", () => {
 
     const button = screen.getByRole("button", { name: "Add connection" });
 
-    expect(fileInput()).toHaveAttribute("accept", ".pdf,.txt,.md,.jpg,.jpeg,.png");
+    expect(fileInput()).toHaveAttribute("accept", ".pdf,.txt,.md,.jpg,.jpeg,.png,.mp3,.mp4");
 
     const clicked = vi.spyOn(fileInput(), "click");
 
@@ -269,7 +269,9 @@ describe("failures (R8)", () => {
     await user.upload(fileInput(), pdf("fake.pdf"));
 
     expect(
-      await screen.findByText("Only PDF, TXT, Markdown, JPG and PNG files are supported."),
+      await screen.findByText(
+        "Only PDF, TXT, Markdown, JPG, PNG, MP3 and MP4 files are supported.",
+      ),
     ).toBeInTheDocument();
   });
 

@@ -12,13 +12,14 @@ export function chunkOf(
   connectionId: string,
   position: number,
   text: string,
-  extra: Partial<Pick<KnowledgeChunk, "page" | "sourceName">> = {},
+  extra: Partial<Pick<KnowledgeChunk, "page" | "sourceName" | "startSeconds">> = {},
 ): KnowledgeChunk {
   return {
     connectionId,
     sourceName: extra.sourceName ?? "notes.txt",
     position,
     ...(extra.page === undefined ? {} : { page: extra.page }),
+    ...(extra.startSeconds === undefined ? {} : { startSeconds: extra.startSeconds }),
     text,
     vector: fakeVectorOf(text),
   };
@@ -97,6 +98,47 @@ export function describeKnowledgeIndexContract(name: string, getIndex: () => Kno
       const second = await index.search(user, fakeVectorOf("second chunk"), { limit: 1 });
 
       expect(second[0]?.page).toBeUndefined();
+    });
+
+    it("keeps the second an audio or video chunk starts at, and leaves it out for the other chunks (spec 0028, R7)", async () => {
+      const index = getIndex();
+      const user = newUser();
+      const connectionId = randomUUID();
+
+      await index.upsert(user, [
+        chunkOf(connectionId, 0, "spoken at twelve thirty", {
+          sourceName: "analysis.mp4",
+          startSeconds: 750,
+        }),
+        chunkOf(connectionId, 1, "spoken at the very start", { startSeconds: 0 }),
+        chunkOf(connectionId, 2, "a chunk of a document", { page: 2 }),
+      ]);
+
+      const [timed] = await index.search(user, fakeVectorOf("spoken at twelve thirty"), {
+        limit: 1,
+      });
+      const [zero] = await index.search(user, fakeVectorOf("spoken at the very start"), {
+        limit: 1,
+      });
+      const [paged] = await index.search(user, fakeVectorOf("a chunk of a document"), { limit: 1 });
+
+      expect(timed).toMatchObject({ sourceName: "analysis.mp4", startSeconds: 750 });
+      expect(timed?.page).toBeUndefined();
+      expect(zero?.startSeconds).toBe(0);
+      expect(paged?.startSeconds).toBeUndefined();
+      expect(paged?.page).toBe(2);
+    });
+
+    it("refuses a negative or fractional start second as an input error (spec 0028)", async () => {
+      const index = getIndex();
+      const user = newUser();
+
+      await expect(
+        index.upsert(user, [chunkOf(randomUUID(), 0, "x", { startSeconds: -1 })]),
+      ).rejects.toBeInstanceOf(KnowledgeInputError);
+      await expect(
+        index.upsert(user, [chunkOf(randomUUID(), 0, "x", { startSeconds: 1.5 })]),
+      ).rejects.toBeInstanceOf(KnowledgeInputError);
     });
 
     it("replaces a chunk written again with the same connection and position (idempotent upsert)", async () => {

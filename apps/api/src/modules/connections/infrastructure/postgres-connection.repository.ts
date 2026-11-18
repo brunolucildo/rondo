@@ -18,7 +18,7 @@ import { isUuidLike } from "../domain/connection-rules";
 import { DataAccessError } from "./data-access-error";
 
 const COLUMNS =
-  "id, user_id, kind, name, size_bytes, content_hash, status, chunk_count, error_code, created_at, updated_at";
+  "id, user_id, kind, name, size_bytes, duration_seconds, content_hash, status, chunk_count, error_code, created_at, updated_at";
 
 const STATUSES: readonly ConnectionStatus[] = ["processing", "ready", "failed"];
 
@@ -29,6 +29,7 @@ interface ConnectionRow extends QueryResultRow {
   name: unknown;
   /** `bigint` arrives as a string. */
   size_bytes: unknown;
+  duration_seconds: unknown;
   content_hash: unknown;
   status: unknown;
   chunk_count: unknown;
@@ -54,6 +55,9 @@ function toConnection(operation: string, row: ConnectionRow): Connection {
     !STATUSES.includes(row.status as ConnectionStatus) ||
     !Number.isSafeInteger(sizeBytes) ||
     typeof row.chunk_count !== "number" ||
+    (row.duration_seconds !== null &&
+      row.duration_seconds !== undefined &&
+      typeof row.duration_seconds !== "number") ||
     (row.error_code !== null &&
       !CONNECTION_ERROR_CODES.includes(row.error_code as ConnectionErrorCode)) ||
     createdAt === null ||
@@ -68,6 +72,7 @@ function toConnection(operation: string, row: ConnectionRow): Connection {
     kind: row.kind as ConnectionKind,
     name: row.name,
     sizeBytes,
+    durationSeconds: typeof row.duration_seconds === "number" ? row.duration_seconds : null,
     contentHash: row.content_hash,
     status: row.status as ConnectionStatus,
     chunkCount: row.chunk_count,
@@ -159,11 +164,18 @@ export class PostgresConnectionRepository implements ConnectionRepository {
     const inserted = await this.one(
       "connections_insert",
       { operation: "insert", collection: "connections" },
-      `insert into public.connections (user_id, kind, name, size_bytes, content_hash, status)
-       values ($1, $2, $3, $4, $5, 'processing')
+      `insert into public.connections (user_id, kind, name, size_bytes, duration_seconds, content_hash, status)
+       values ($1, $2, $3, $4, $5, $6, 'processing')
        on conflict (user_id, content_hash) do nothing
        returning ${COLUMNS}`,
-      [userId, connection.kind, connection.name, connection.sizeBytes, connection.contentHash],
+      [
+        userId,
+        connection.kind,
+        connection.name,
+        connection.sizeBytes,
+        connection.durationSeconds ?? null,
+        connection.contentHash,
+      ],
     );
 
     if (inserted !== null) {
@@ -246,15 +258,20 @@ export class PostgresConnectionRepository implements ConnectionRepository {
     return rows.map((row) => toConnection("connections_list", row));
   }
 
-  async hasActiveProcessing(userId: string, staleBefore: Date): Promise<boolean> {
+  async hasActiveProcessing(
+    userId: string,
+    staleBefore: Date,
+    mediaStaleBefore: Date = staleBefore,
+  ): Promise<boolean> {
     const [row] = await this.run(
       "connections_has_active_processing",
       { operation: "select", collection: "connections" },
       `select exists (
          select 1 from public.connections
-          where user_id = $1 and status = 'processing' and updated_at >= $2
+          where user_id = $1 and status = 'processing'
+            and updated_at >= case when kind in ('audio', 'video') then $3::timestamptz else $2::timestamptz end
        ) as found`,
-      [userId, staleBefore.toISOString()],
+      [userId, staleBefore.toISOString(), mediaStaleBefore.toISOString()],
     );
     const found: unknown = row?.found;
 
@@ -265,29 +282,40 @@ export class PostgresConnectionRepository implements ConnectionRepository {
     return found;
   }
 
-  async deleteSettled(userId: string, connectionId: string, staleBefore: Date): Promise<boolean> {
+  async deleteSettled(
+    userId: string,
+    connectionId: string,
+    staleBefore: Date,
+    mediaStaleBefore: Date = staleBefore,
+  ): Promise<boolean> {
     const rows = await this.run(
       "connections_delete",
       { operation: "delete", collection: "connections" },
       `delete from public.connections
         where id = $1 and user_id = $2
-          and not (status = 'processing' and updated_at >= $3)
+          and not (status = 'processing'
+                   and updated_at >= case when kind in ('audio', 'video') then $4::timestamptz else $3::timestamptz end)
         returning id`,
-      [connectionId, userId, staleBefore.toISOString()],
+      [connectionId, userId, staleBefore.toISOString(), mediaStaleBefore.toISOString()],
     );
 
     return rows.length > 0;
   }
 
-  async deleteAllSettled(userId: string, staleBefore: Date): Promise<number> {
+  async deleteAllSettled(
+    userId: string,
+    staleBefore: Date,
+    mediaStaleBefore: Date = staleBefore,
+  ): Promise<number> {
     const rows = await this.run(
       "connections_delete_all",
       { operation: "delete", collection: "connections" },
       `delete from public.connections
         where user_id = $1
-          and not (status = 'processing' and updated_at >= $2)
+          and not (status = 'processing'
+                   and updated_at >= case when kind in ('audio', 'video') then $3::timestamptz else $2::timestamptz end)
         returning id`,
-      [userId, staleBefore.toISOString()],
+      [userId, staleBefore.toISOString(), mediaStaleBefore.toISOString()],
     );
 
     return rows.length;
@@ -309,5 +337,42 @@ export class PostgresConnectionRepository implements ConnectionRepository {
     );
 
     return rows.flatMap((row) => (typeof row.id === "string" ? [row.id] : []));
+  }
+
+  async countActiveMedia(userId: string, staleBefore: Date): Promise<number> {
+    const [row] = await this.run(
+      "connections_count_active_media",
+      { operation: "select", collection: "connections" },
+      `select count(*)::int as total from public.connections
+        where user_id = $1 and kind in ('audio', 'video') and status = 'processing' and updated_at >= $2`,
+      [userId, staleBefore.toISOString()],
+    );
+    const total: unknown = row?.total;
+
+    if (typeof total !== "number") {
+      throw new DataAccessError("connections_count_active_media", "UNEXPECTED_RESULT");
+    }
+
+    return total;
+  }
+
+  async reserveMediaSeconds(
+    userId: string,
+    seconds: number,
+    maxSecondsPerDay: number,
+  ): Promise<boolean> {
+    // One statement: the insert happens only when the day's total plus this media fits.
+    const rows = await this.run(
+      "connections_reserve_media",
+      { operation: "insert", collection: "connection_media_usage" },
+      `insert into public.connection_media_usage (user_id, seconds)
+       select $1::uuid, $2::int
+        where (select coalesce(sum(seconds), 0) from public.connection_media_usage
+                where user_id = $1::uuid and used_at > now() - interval '24 hours') + $2::int <= $3::int
+       returning id`,
+      [userId, seconds, maxSecondsPerDay],
+    );
+
+    return rows.length > 0;
   }
 }

@@ -8,6 +8,7 @@ import {
   describeDeleteFailure,
   describeProcessingFailure,
   formatSize,
+  formatTimestamp,
   kindLabel,
   statusLabel,
 } from "./connection-messages";
@@ -57,6 +58,9 @@ function ConnectionRow({ connection, disabled, onDelete }: ConnectionRowProps) {
         </p>
         <p className="text-sm text-muted-foreground">
           {kindLabel(connection.kind)} · {formatSize(connection.sizeBytes)} ·{" "}
+          {connection.durationSeconds == null
+            ? null
+            : `${formatTimestamp(connection.durationSeconds)} · `}
           {statusLabel(connection.status)} ·{" "}
           <time dateTime={connection.createdAt}>{formatDate(connection.createdAt)}</time>
         </p>

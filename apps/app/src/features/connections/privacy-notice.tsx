@@ -4,14 +4,19 @@ import { type KeyboardEvent, useEffect, useId, useRef } from "react";
 export interface PrivacyNoticeProps {
   onAccept: () => void;
   onCancel: () => void;
+  /** The file is an audio or a video: it also goes to Gemini, voice and image included (spec 0028). */
+  media?: boolean;
 }
+
+const MEDIA_NOTICE =
+  "Audio and video files, including the voice and the image of people, are sent to Google Gemini to be turned into text; the provider's copy is deleted when the processing ends. ";
 
 /**
  * The notice shown before the first file is sent (once per browser). A modal dialog: focus moves
  * to `Cancel` (the safe choice), Tab stays inside, Escape cancels and focus returns to where it
  * was. Nothing is uploaded until the person accepts.
  */
-export function PrivacyNotice({ onAccept, onCancel }: PrivacyNoticeProps) {
+export function PrivacyNotice({ onAccept, onCancel, media = false }: PrivacyNoticeProps) {
   const ids = useId();
   const titleId = `${ids}-title`;
   const descriptionId = `${ids}-description`;
@@ -72,9 +77,10 @@ export function PrivacyNotice({ onAccept, onCancel }: PrivacyNoticeProps) {
         </h2>
         <p id={descriptionId} className="text-base">
           The content of the file is sent to an AI provider to be turned into searchable data
-          (embeddings). Images are sent to the AI provider too, to be described and read as text.
-          Personal and health data must only be used with the authorization of the people concerned.
-          The original file is not kept: only the extracted text is stored.
+          (embeddings). Images are sent to the AI provider too, to be described and read as text.{" "}
+          {media ? MEDIA_NOTICE : null}Personal and health data must only be used with the
+          authorization of the people concerned. The original file is not kept: only the extracted
+          text is stored.
         </p>
         <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           <Button variant="outline" onClick={onCancel}>

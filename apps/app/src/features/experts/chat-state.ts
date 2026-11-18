@@ -21,6 +21,8 @@ export interface Citation {
   /** One-based, or `null` for a source without pages. */
   page: number | null;
   position: number;
+  /** Second of an audio or video the passage starts at (spec 0028); absent for the other kinds. */
+  startSeconds?: number;
   /** Only the conversation read from the server says it (`false` while the source exists). */
   removed?: false;
 }

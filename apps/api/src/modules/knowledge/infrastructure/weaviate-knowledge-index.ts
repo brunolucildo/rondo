@@ -37,7 +37,9 @@ const MAX_DELETE_ROUNDS = 100;
 const CHUNK_ID_NAMESPACE = "5d3f6b4e-2c1a-4e8b-9f70-6a1d0c8e7b21";
 
 const TEXT_KEY = "text";
-const METADATA_KEYS = ["connectionId", "sourceName", "position", "page"];
+/** Added by spec 0028 (audio and video): optional, so older collections get it on first use. */
+const START_SECONDS_KEY = "startSeconds";
+const METADATA_KEYS = ["connectionId", "sourceName", "position", "page", "startSeconds"];
 
 /** The store only reads vectors here; asking it to embed anything is a bug. */
 const NO_EMBEDDINGS = {
@@ -287,6 +289,8 @@ export class WeaviateKnowledgeIndex implements KnowledgeIndex {
 
   private async ensureCollection(client: WeaviateClient): Promise<void> {
     if (await client.collections.exists(this.collection)) {
+      await this.ensureStartSecondsProperty(client);
+
       return;
     }
 
@@ -304,12 +308,37 @@ export class WeaviateKnowledgeIndex implements KnowledgeIndex {
           { name: "sourceName", dataType: "text", indexFilterable: false, indexSearchable: false },
           { name: "position", dataType: "int" },
           { name: "page", dataType: "int" },
+          { name: START_SECONDS_KEY, dataType: "int" },
           { name: TEXT_KEY, dataType: "text", indexFilterable: false, indexSearchable: false },
         ],
       });
     } catch (error) {
       // Two processes can race to create it; the loser finds it already there.
       if (!(await client.collections.exists(this.collection))) {
+        throw error;
+      }
+    }
+  }
+
+  /**
+   * A collection created before spec 0028 has no `startSeconds`. Adding a property is additive and
+   * safe for the code that does not know it, so the index adds it once, on first use.
+   */
+  private async ensureStartSecondsProperty(client: WeaviateClient): Promise<void> {
+    const collection = client.collections.get(this.collection);
+    const config = await collection.config.get();
+
+    if (config.properties.some((property) => property.name === START_SECONDS_KEY)) {
+      return;
+    }
+
+    try {
+      await collection.config.addProperty({ name: START_SECONDS_KEY, dataType: "int" });
+    } catch (error) {
+      // Another process can add it at the same time; the loser finds it already there.
+      const after = await collection.config.get();
+
+      if (!after.properties.some((property) => property.name === START_SECONDS_KEY)) {
         throw error;
       }
     }
@@ -327,6 +356,7 @@ function toObject(chunk: KnowledgeChunk): DataObject<undefined> {
       sourceName: chunk.sourceName,
       position: chunk.position,
       ...(chunk.page === undefined ? {} : { page: chunk.page }),
+      ...(chunk.startSeconds === undefined ? {} : { [START_SECONDS_KEY]: chunk.startSeconds }),
       [TEXT_KEY]: chunk.text,
     },
   };
@@ -337,13 +367,14 @@ function toHit(
   metadata: Record<string, unknown>,
   distance: number,
 ): KnowledgeSearchHit {
-  const { connectionId, sourceName, position, page } = metadata;
+  const { connectionId, sourceName, position, page, startSeconds } = metadata;
 
   return {
     connectionId: String(connectionId),
     sourceName: String(sourceName),
     position: Number(position),
     ...(typeof page === "number" ? { page } : {}),
+    ...(typeof startSeconds === "number" ? { startSeconds } : {}),
     text,
     // Cosine distance is 1 - similarity.
     score: 1 - distance,

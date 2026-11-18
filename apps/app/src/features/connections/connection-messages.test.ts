@@ -26,7 +26,7 @@ describe("image messages (spec 0026)", () => {
 
     for (const name of ["a.gif", "a.webp", "a.heic", "a.svg"]) {
       expect(checkFileBeforeUpload(file(name))?.text).toBe(
-        "Only PDF, TXT, Markdown, JPG and PNG files are supported.",
+        "Only PDF, TXT, Markdown, JPG, PNG, MP3 and MP4 files are supported.",
       );
     }
   });

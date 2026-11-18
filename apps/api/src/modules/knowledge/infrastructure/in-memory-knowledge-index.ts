@@ -72,6 +72,7 @@ export class InMemoryKnowledgeIndex implements KnowledgeIndex {
         sourceName: chunk.sourceName,
         position: chunk.position,
         ...(chunk.page === undefined ? {} : { page: chunk.page }),
+        ...(chunk.startSeconds === undefined ? {} : { startSeconds: chunk.startSeconds }),
         text: chunk.text,
         score,
       }));

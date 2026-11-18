@@ -1,16 +1,26 @@
 import type { Connection } from "../../domain/connection";
-import { ConnectionLimitReachedError, InvalidUploadError } from "../../domain/connection-errors";
+import {
+  ConnectionLimitReachedError,
+  InvalidUploadError,
+  MediaDailyLimitError,
+  MediaUnavailableError,
+  TooManyProcessingError,
+} from "../../domain/connection-errors";
 import type {
   ConnectionRepository,
   ConnectionTelemetry,
   ContentHasher,
 } from "../../domain/connection-ports";
 import {
+  isMediaKind,
   isStaleProcessing,
   kindOfFileName,
   MAX_CONNECTIONS_PER_USER,
+  MAX_MEDIA_SECONDS_PER_DAY,
+  MAX_SIMULTANEOUS_MEDIA_PER_USER,
   sanitizeFileName,
-  STALE_PROCESSING_MS,
+  STALE_MEDIA_PROCESSING_MS,
+  staleProcessingMsOf,
 } from "../../domain/connection-rules";
 import { assertUploadContent } from "../../domain/upload-validation";
 import type { ConnectionProcessor } from "../services/connection-processor";
@@ -39,6 +49,10 @@ export interface UploadConnectionResult {
  *   inserted and processing is scheduled. Two simultaneous uploads of the same content meet at the
  *   unique `(user, hash)` index: one creates, the other receives the same row.
  *
+ * Audio and video (spec 0028) also need the media provider (`MEDIA_UNAVAILABLE` without it), fewer
+ * than 2 other media being processed (`TOO_MANY_PROCESSING`) and minutes left in the day
+ * (`MEDIA_DAILY_LIMIT`), checked only when processing is about to start: a duplicate is free.
+ *
  * The use case never processes the file itself: it hands it to the `ConnectionProcessor`.
  */
 export class UploadConnection {
@@ -48,6 +62,8 @@ export class UploadConnection {
     private readonly processor: ConnectionProcessor,
     private readonly telemetry: ConnectionTelemetry,
     private readonly now: () => Date = () => new Date(),
+    /** Whether audio and video can be processed (a provider key is configured). */
+    private readonly mediaAvailable: () => boolean = () => false,
   ) {}
 
   async execute({
@@ -62,29 +78,32 @@ export class UploadConnection {
       throw new InvalidUploadError("UNSUPPORTED_FILE");
     }
 
-    assertUploadContent(kind, bytes);
+    const { durationSeconds } = assertUploadContent(kind, bytes);
 
     const contentHash = this.hasher.sha256(bytes);
     const existing = await this.repository.findByContentHash(userId, contentHash);
 
     if (existing !== null) {
-      return this.reuse(userId, existing, bytes, startedAt);
+      return this.reuse(userId, existing, bytes, durationSeconds, startedAt);
     }
 
     if ((await this.repository.countByUser(userId)) >= MAX_CONNECTIONS_PER_USER) {
       throw new ConnectionLimitReachedError();
     }
 
+    await this.admitMedia(userId, kind, durationSeconds);
+
     const inserted = await this.repository.insertProcessing(userId, {
       kind,
       name: sanitizeFileName(fileName, kind),
       sizeBytes: bytes.byteLength,
+      durationSeconds,
       contentHash,
     });
 
     if (!inserted.created) {
       // Another request inserted the same content between our lookup and our insert.
-      return this.reuse(userId, inserted.connection, bytes, startedAt);
+      return this.reuse(userId, inserted.connection, bytes, durationSeconds, startedAt);
     }
 
     this.processor.enqueue({ userId, connection: inserted.connection, bytes, clearFirst: false });
@@ -92,17 +111,55 @@ export class UploadConnection {
     return { connection: inserted.connection, deduplicated: false };
   }
 
+  /**
+   * The checks that only audio and video have, before anything is written (spec 0028): the provider
+   * is configured, the user has a free slot and minutes left in the day. The minutes are booked here.
+   */
+  private async admitMedia(
+    userId: string,
+    kind: Connection["kind"],
+    durationSeconds: number | null,
+  ): Promise<void> {
+    if (!isMediaKind(kind)) {
+      return;
+    }
+
+    if (!this.mediaAvailable()) {
+      throw new MediaUnavailableError();
+    }
+
+    const staleBefore = new Date(this.now().getTime() - STALE_MEDIA_PROCESSING_MS);
+
+    if (
+      (await this.repository.countActiveMedia(userId, staleBefore)) >=
+      MAX_SIMULTANEOUS_MEDIA_PER_USER
+    ) {
+      throw new TooManyProcessingError();
+    }
+
+    if (
+      !(await this.repository.reserveMediaSeconds(
+        userId,
+        durationSeconds ?? 1,
+        MAX_MEDIA_SECONDS_PER_DAY,
+      ))
+    ) {
+      throw new MediaDailyLimitError();
+    }
+  }
+
   private async reuse(
     userId: string,
     found: Connection,
     bytes: Uint8Array,
+    durationSeconds: number | null,
     startedAt: number,
   ): Promise<UploadConnectionResult> {
     let connection = found;
 
     if (isStaleProcessing(connection, this.now())) {
       // The worker is gone (API restart): the connection is failed and this upload retries it.
-      const cutoff = new Date(this.now().getTime() - STALE_PROCESSING_MS);
+      const cutoff = new Date(this.now().getTime() - staleProcessingMsOf(connection.kind));
 
       connection =
         (await this.repository.failIfStale(
@@ -116,6 +173,8 @@ export class UploadConnection {
     }
 
     if (connection.status === "failed") {
+      await this.admitMedia(userId, connection.kind, durationSeconds);
+
       const claimed = await this.repository.claimFailed(userId, connection.id);
 
       if (claimed !== null) {
