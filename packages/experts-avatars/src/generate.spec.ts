@@ -34,11 +34,18 @@ class FakeClient implements ImageClient {
 
     for (const part of this.hang) {
       if (request.prompt.includes(part)) {
-        await new Promise((_, reject) =>
-          request.signal.addEventListener("abort", () =>
-            reject(new ImageGenerationError("timeout", "timed out", true)),
-          ),
-        );
+        await new Promise((_, reject) => {
+          const fail = () => reject(new ImageGenerationError("timeout", "timed out", true));
+
+          // Under load the abort can fire before this listener exists: an already aborted signal
+          // would never emit again and the test would hang.
+          if (request.signal.aborted) {
+            fail();
+            return;
+          }
+
+          request.signal.addEventListener("abort", fail, { once: true });
+        });
       }
     }
 
