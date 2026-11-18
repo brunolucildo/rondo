@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { validateEnvironment } from "./environment";
+import { loadEnvironment, validateEnvironment } from "./environment";
 
 const validEnv = {
   DATABASE_URL: "postgres://rondo_app:rondo@localhost:5432/rondo",
@@ -212,5 +212,25 @@ describe("validateEnvironment", () => {
     expect(() => validateEnvironment({ ...validEnv, AUTH_JWT_SECRET: short })).not.toThrowError(
       new RegExp(short),
     );
+  });
+});
+
+describe("loadEnvironment", () => {
+  it("keeps the raw variables next to the typed settings (the knowledge and media modules read them by name)", () => {
+    const loaded = loadEnvironment({
+      ...validEnv,
+      WEAVIATE_URL: "http://localhost:8080",
+      WEAVIATE_API_KEY: "weaviate-key",
+      GEMINI_API_KEY: "gemini-key",
+    });
+
+    expect(loaded.WEAVIATE_URL).toBe("http://localhost:8080");
+    expect(loaded.WEAVIATE_API_KEY).toBe("weaviate-key");
+    expect(loaded.GEMINI_API_KEY).toBe("gemini-key");
+    expect(loaded.apiPort).toBe(3002);
+  });
+
+  it("still rejects an invalid environment", () => {
+    expect(() => loadEnvironment({})).toThrow(/Missing required environment variables/);
   });
 });

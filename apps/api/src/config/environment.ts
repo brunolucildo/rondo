@@ -152,3 +152,13 @@ export function validateEnvironment(env: Record<string, string | undefined>): En
     expertRetrieval: parseExpertRetrievalConfig(env),
   };
 }
+
+/**
+ * What `ConfigModule` receives as `validate`. Nest exposes only the object the validator returns:
+ * without the raw variables, `ConfigService.get("WEAVIATE_URL")` (and `OPENAI_API_KEY` for
+ * embeddings and vision, `GEMINI_*`) is `undefined` whenever the value lives only in `.env`. So the
+ * typed settings are added on top of the raw variables, never instead of them.
+ */
+export function loadEnvironment(env: Record<string, string | undefined>): Record<string, unknown> {
+  return { ...env, ...validateEnvironment(env) };
+}
