@@ -65,7 +65,7 @@ Reaproveitam o pipeline da 0023 (uma porta de extrator por tipo), a busca da 002
 
 | Ordem | Spec | Capacidade | Depende de | Paralelo com | Tamanho | Status |
 | ----- | ---- | ---------- | ---------- | ------------ | ------- | ------ |
-| 0026 | [`0026-connections-images`](../.specs/0026-connections-images.md) | JPG, JPEG e PNG: visão do `gpt-4o-mini` transcreve e descreve, o texto entra no pipeline, mesmo dedup, citação e exclusão | 0023, 0024, 0025 | 0027, 0028, 0029 | P | pronta |
+| 0026 | [`0026-connections-images`](../.specs/0026-connections-images.md) | JPG, JPEG e PNG: visão do `gpt-4o-mini` transcreve e descreve, o texto entra no pipeline, mesmo dedup, citação e exclusão | 0023, 0024, 0025 | 0027, 0028, 0029 | P | concluída |
 | 0027 | [`0027-connections-url`](../.specs/0027-connections-url.md) | Link de URL externa: busca protegida contra **SSRF**, extração de HTML, PDF e texto, dedup pela URL canônica e pelo conteúdo, segredos de URL nunca guardados | 0023, 0024, 0025 | 0026, 0028, 0029 | G | pronta |
 | 0028 | [`0028-connections-audio-video`](../.specs/0028-connections-audio-video.md) | MP3 e MP4 por modelo Gemini de entendimento, processamento assíncrono, citação com `mm:ss`, arquivo apagado no provedor | 0022, 0023, 0024, 0025 | 0026, 0027, 0029 | G | pronta |
 | 0029 | [`0029-experts-agent-observability`](../.specs/0029-experts-agent-observability.md) | Spans por nó do LangGraph, métricas de latência, primeiro token e tokens, dashboard e alertas no Grafana, trava do tracing do LangSmith | 0019, 0022, 0023, 0024, 0025 | 0026, 0027, 0028 | M | pronta |

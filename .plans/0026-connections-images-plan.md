@@ -61,7 +61,7 @@ R1 a R8 da spec; critérios de aceite valem sem alteração.
 
 ## Arquivos previstos
 
-`db/migrations/*_connections_image_kind.sql`, `apps/api/src/modules/connections/**`, `apps/api/src/observability/connection-telemetry.ts`, `apps/api/test/connections-images.int-spec.ts`, `apps/app/src/features/connections/**`, `e2e/connections-images.spec.ts`, `.env.example`, `.docs/*`, `.adrs/XXXX-0026-*.md`.
+`db/migrations/*_connections_image_kind.sql`, `apps/api/src/modules/connections/**`, `apps/api/src/observability/connection-telemetry.ts`, `apps/api/test/connections-images.int-spec.ts`, `apps/app/src/features/connections/**`, `e2e/connections-images.spec.ts`, `.env.example`, `.docs/*`, `.adrs/0027-imagens-como-texto-por-visao.md`.
 
 ## Testes
 
@@ -74,7 +74,7 @@ Descrição "inventada" (instrução de não inferir; revisão manual em `QA.md`
 ## Critério de pronto
 
 - [x] Gates lint, tipos, build, testes unitários, integração e E2E.
-- [x] ADR e docs atualizados (`.adrs/XXXX-0026-imagens-como-texto-por-visao.md`, número provisório).
+- [x] ADR e docs atualizados (`.adrs/0027-imagens-como-texto-por-visao.md`).
 - [ ] Commit e push feitos.
 
 ## Perguntas abertas

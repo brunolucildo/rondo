@@ -1,4 +1,4 @@
-# XXXX — Imagens como conexão: visão converte em texto, o resto do pipeline não muda
+# 0027 — Imagens como conexão: visão converte em texto, o resto do pipeline não muda
 
 - **Status:** aceito
 - **Data:** 2026-11-17
