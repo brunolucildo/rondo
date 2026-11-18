@@ -9,6 +9,7 @@ import { createValidationException } from "./common/validation-exception";
 import type { Environment } from "./config/environment";
 import { createAuthTelemetryMiddleware } from "./modules/auth";
 import { createHttpRouteMiddleware } from "./observability/http-route";
+import { disableLangSmithTracing } from "./observability/langsmith-guard";
 import { baseLogger, StructuredLogger } from "./observability/logger";
 
 export const API_PREFIX = "api/v1";
@@ -102,6 +103,9 @@ export function configureApp(app: INestApplication): INestApplication {
 }
 
 export async function createNestApp() {
+  // The LangChain tracing to LangSmith (a third party) is off for the whole process, from boot.
+  disableLangSmithTracing();
+
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
 
   return configureApp(app);

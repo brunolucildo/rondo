@@ -739,6 +739,9 @@ describe("experts answers grounded on the connected sources (Postgres and Weavia
           "outcome",
           "reason",
           "scope",
+          // Spec 0029 (R5): the ids of the retrieval span, so the log opens its trace.
+          "span_id",
+          "trace_id",
         ]);
         expect(
           (await recorder.metric("expert.retrievals")).map((point) => [
