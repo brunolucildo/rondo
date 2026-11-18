@@ -2,11 +2,7 @@
   "uid": "rondo-experts-observability",
   "title": "Rondo — Experts",
   "description": "Respostas, latência, primeiro token, tokens, falhas, recuperação, dependências e ingestão de conexões dos experts (LangGraph), por OpenTelemetry.",
-  "tags": [
-    "rondo",
-    "experts",
-    "observabilidade"
-  ],
+  "tags": ["rondo", "experts", "observabilidade"],
   "timezone": "browser",
   "schemaVersion": 39,
   "version": 1,
@@ -18,13 +14,7 @@
     "to": "now"
   },
   "timepicker": {
-    "refresh_intervals": [
-      "10s",
-      "30s",
-      "1m",
-      "5m",
-      "15m"
-    ]
+    "refresh_intervals": ["10s", "30s", "1m", "5m", "15m"]
   },
   "links": [],
   "annotations": {
@@ -119,9 +109,7 @@
       },
       "options": {
         "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "fields": "",
           "values": false
         },
@@ -185,9 +173,7 @@
       },
       "options": {
         "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "fields": "",
           "values": false
         },
@@ -255,9 +241,7 @@
       },
       "options": {
         "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "fields": "",
           "values": false
         },
@@ -318,9 +302,7 @@
       },
       "options": {
         "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "fields": "",
           "values": false
         },
@@ -389,9 +371,7 @@
       },
       "options": {
         "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "fields": "",
           "values": false
         },
@@ -452,9 +432,7 @@
       },
       "options": {
         "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "fields": "",
           "values": false
         },
@@ -544,10 +522,7 @@
           "displayMode": "table",
           "placement": "bottom",
           "showLegend": true,
-          "calcs": [
-            "lastNotNull",
-            "max"
-          ]
+          "calcs": ["lastNotNull", "max"]
         },
         "tooltip": {
           "mode": "multi",
@@ -735,10 +710,7 @@
           "displayMode": "table",
           "placement": "bottom",
           "showLegend": true,
-          "calcs": [
-            "lastNotNull",
-            "max"
-          ]
+          "calcs": ["lastNotNull", "max"]
         },
         "tooltip": {
           "mode": "multi",
@@ -812,10 +784,7 @@
           "displayMode": "table",
           "placement": "bottom",
           "showLegend": true,
-          "calcs": [
-            "lastNotNull",
-            "max"
-          ]
+          "calcs": ["lastNotNull", "max"]
         },
         "tooltip": {
           "mode": "multi",
@@ -902,10 +871,7 @@
           "displayMode": "table",
           "placement": "bottom",
           "showLegend": true,
-          "calcs": [
-            "lastNotNull",
-            "max"
-          ]
+          "calcs": ["lastNotNull", "max"]
         },
         "tooltip": {
           "mode": "multi",
@@ -964,9 +930,7 @@
       },
       "options": {
         "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "fields": "",
           "values": false
         },
@@ -1055,10 +1019,7 @@
           "displayMode": "table",
           "placement": "bottom",
           "showLegend": true,
-          "calcs": [
-            "lastNotNull",
-            "max"
-          ]
+          "calcs": ["lastNotNull", "max"]
         },
         "tooltip": {
           "mode": "multi",
@@ -1233,10 +1194,7 @@
           "displayMode": "table",
           "placement": "bottom",
           "showLegend": true,
-          "calcs": [
-            "lastNotNull",
-            "max"
-          ]
+          "calcs": ["lastNotNull", "max"]
         },
         "tooltip": {
           "mode": "multi",
@@ -1394,10 +1352,7 @@
           "displayMode": "table",
           "placement": "bottom",
           "showLegend": true,
-          "calcs": [
-            "lastNotNull",
-            "max"
-          ]
+          "calcs": ["lastNotNull", "max"]
         },
         "tooltip": {
           "mode": "multi",
@@ -1471,10 +1426,7 @@
           "displayMode": "table",
           "placement": "bottom",
           "showLegend": true,
-          "calcs": [
-            "lastNotNull",
-            "max"
-          ]
+          "calcs": ["lastNotNull", "max"]
         },
         "tooltip": {
           "mode": "multi",
@@ -1561,10 +1513,7 @@
           "displayMode": "table",
           "placement": "bottom",
           "showLegend": true,
-          "calcs": [
-            "lastNotNull",
-            "max"
-          ]
+          "calcs": ["lastNotNull", "max"]
         },
         "tooltip": {
           "mode": "multi",
@@ -1638,10 +1587,7 @@
           "displayMode": "table",
           "placement": "bottom",
           "showLegend": true,
-          "calcs": [
-            "lastNotNull",
-            "max"
-          ]
+          "calcs": ["lastNotNull", "max"]
         },
         "tooltip": {
           "mode": "multi",
@@ -1715,10 +1661,7 @@
           "displayMode": "table",
           "placement": "bottom",
           "showLegend": true,
-          "calcs": [
-            "lastNotNull",
-            "max"
-          ]
+          "calcs": ["lastNotNull", "max"]
         },
         "tooltip": {
           "mode": "multi",
@@ -1792,10 +1735,7 @@
           "displayMode": "table",
           "placement": "bottom",
           "showLegend": true,
-          "calcs": [
-            "lastNotNull",
-            "max"
-          ]
+          "calcs": ["lastNotNull", "max"]
         },
         "tooltip": {
           "mode": "multi",
@@ -1882,10 +1822,7 @@
           "displayMode": "table",
           "placement": "bottom",
           "showLegend": true,
-          "calcs": [
-            "lastNotNull",
-            "max"
-          ]
+          "calcs": ["lastNotNull", "max"]
         },
         "tooltip": {
           "mode": "multi",
@@ -1959,10 +1896,7 @@
           "displayMode": "table",
           "placement": "bottom",
           "showLegend": true,
-          "calcs": [
-            "lastNotNull",
-            "max"
-          ]
+          "calcs": ["lastNotNull", "max"]
         },
         "tooltip": {
           "mode": "multi",
@@ -2036,10 +1970,7 @@
           "displayMode": "table",
           "placement": "bottom",
           "showLegend": true,
-          "calcs": [
-            "lastNotNull",
-            "max"
-          ]
+          "calcs": ["lastNotNull", "max"]
         },
         "tooltip": {
           "mode": "multi",
@@ -2113,10 +2044,7 @@
           "displayMode": "table",
           "placement": "bottom",
           "showLegend": true,
-          "calcs": [
-            "lastNotNull",
-            "max"
-          ]
+          "calcs": ["lastNotNull", "max"]
         },
         "tooltip": {
           "mode": "multi",
@@ -2131,6 +2059,450 @@
       }
     },
     {
+      "id": 39,
+      "type": "timeseries",
+      "title": "Visão (imagens): duração da chamada ao modelo (p95 por resultado)",
+      "description": "`outcome`: success, refused (o modelo recusou) ou unavailable. Spec 0026.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.95, sum by (le, outcome) (rate(connection_vision_duration_seconds_bucket{job=\"rondo-api\"}[$__rate_interval])))",
+          "legendFormat": "{{outcome}}",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 2,
+          "noValue": "sem dados",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 12,
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": ["lastNotNull", "max"]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 103
+      }
+    },
+    {
+      "id": 40,
+      "type": "timeseries",
+      "title": "Busca de links: duração (p95 por resultado)",
+      "description": "`outcome`: success, failure ou blocked (a proteção contra SSRF recusou). A URL, o host e o caminho nunca entram. Spec 0027.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.95, sum by (le, outcome) (rate(url_fetch_duration_seconds_bucket{job=\"rondo-api\"}[$__rate_interval])))",
+          "legendFormat": "{{outcome}}",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 2,
+          "noValue": "sem dados",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 12,
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": ["lastNotNull", "max"]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 103
+      }
+    },
+    {
+      "id": 41,
+      "type": "timeseries",
+      "title": "Busca de links bloqueada, por motivo (por minuto)",
+      "description": "`reason`: scheme, port, credentials, address ou redirect. Um pico indica tentativa de alcançar a rede interna ou um link malformado. Spec 0027.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "sum by (reason) (rate(url_fetch_blocked_total{job=\"rondo-api\"}[$__rate_interval])) * 60",
+          "legendFormat": "{{reason}}",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "opm",
+          "decimals": 2,
+          "noValue": "sem dados",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "custom": {
+            "drawStyle": "bars",
+            "lineWidth": 1,
+            "fillOpacity": 70,
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": ["lastNotNull", "max"]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 111
+      }
+    },
+    {
+      "id": 42,
+      "type": "timeseries",
+      "title": "Mídia (áudio e vídeo): minutos enviados ao processamento, por tipo e resultado (por minuto)",
+      "description": "Minutos de mídia enviados ao Gemini. Principal vetor de custo da ingestão. Spec 0028.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "sum by (kind, outcome) (rate(connection_media_minutes_total{job=\"rondo-api\"}[$__rate_interval])) * 60",
+          "legendFormat": "{{kind}} / {{outcome}}",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 2,
+          "noValue": "sem dados",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "custom": {
+            "drawStyle": "bars",
+            "lineWidth": 1,
+            "fillOpacity": 70,
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": ["lastNotNull", "max"]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 111
+      }
+    },
+    {
+      "id": 43,
+      "type": "timeseries",
+      "title": "Mídia: segundos de processamento por minuto de mídia (p95 por tipo)",
+      "description": "Mede a velocidade do Gemini para cada minuto de áudio ou vídeo. Spec 0028.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "histogram_quantile(0.95, sum by (le, kind) (rate(connection_media_processing_per_media_minute_seconds_bucket{job=\"rondo-api\"}[$__rate_interval])))",
+          "legendFormat": "{{kind}}",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 2,
+          "noValue": "sem dados",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 12,
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": ["lastNotNull", "max"]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 119
+      }
+    },
+    {
+      "id": 44,
+      "type": "timeseries",
+      "title": "Mídia: exclusão do arquivo no provedor, por resultado (por minuto)",
+      "description": "`outcome`: deleted, pending (falhou, nova tentativa depois) ou retried. `pending` sustentado deixa arquivo no provedor. Spec 0028.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "expr": "sum by (outcome) (rate(connection_media_cleanups_total{job=\"rondo-api\"}[$__rate_interval])) * 60",
+          "legendFormat": "{{outcome}}",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "opm",
+          "decimals": 2,
+          "noValue": "sem dados",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "custom": {
+            "drawStyle": "bars",
+            "lineWidth": 1,
+            "fillOpacity": 70,
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": ["lastNotNull", "max"]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 119
+      }
+    },
+    {
       "id": 35,
       "type": "row",
       "title": "Traces",
@@ -2139,7 +2511,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 103
+        "y": 127
       },
       "panels": []
     },
@@ -2188,7 +2560,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 104
+        "y": 128
       }
     },
     {
@@ -2236,7 +2608,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 104
+        "y": 128
       }
     }
   ]

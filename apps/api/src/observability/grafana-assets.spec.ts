@@ -199,7 +199,8 @@ function sourceTexts(directory: string): string[] {
 function emittedSeries(): Set<string> {
   const names = new Set<string>();
   const declaration =
-    /create(Counter|Histogram|Gauge)\(\s*"([^"]+)"\s*,\s*\{([\s\S]*?)\n\s{4,6}\}\)/g;
+    // The closing accepts both `})` and the multi-line form `},\n)` (a call that wraps its arguments).
+    /create(Counter|Histogram|Gauge)\(\s*"([^"]+)"\s*,\s*\{([\s\S]*?)\n\s{4,8}\}\s*,?\s*\)/g;
 
   for (const text of sourceTexts(SRC)) {
     for (const [, kind, name, body] of text.matchAll(declaration)) {
@@ -249,7 +250,7 @@ describe("provisioned Grafana dashboard Rondo — Experts (spec 0029)", () => {
     const emitted = emittedSeries();
     const used = new Set(
       expressions.flatMap((expr) =>
-        [...expr.matchAll(/\b((?:expert|knowledge|connection)_[a-z_]+)\b/g)].map(
+        [...expr.matchAll(/\b((?:expert|knowledge|connection|url_fetch)_[a-z_]+)\b/g)].map(
           (match) => match[1] ?? "",
         ),
       ),
