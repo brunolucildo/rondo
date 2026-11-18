@@ -1,4 +1,4 @@
-# 0027 — Política de saída de rede da API (busca de links)
+# 0030 — Política de saída de rede da API (busca de links)
 
 - **Status:** aceito (número provisório: o orquestrador renumera na integração)
 - **Data:** 2026-11-18

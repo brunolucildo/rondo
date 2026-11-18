@@ -5,7 +5,7 @@ import type { ExtractedSection, TextChunker } from "../domain/connection-ports";
 /**
  * Splits each section (a page, or the whole text) on paragraph, line, sentence and word
  * boundaries into chunks of about 1,000 characters with 150 of overlap. A chunk never crosses a
- * page, so its `page` is exact.
+ * page, so its `page` is exact; a section that starts at a second keeps it on every piece.
  */
 export class RecursiveTextChunker implements TextChunker {
   private readonly splitter = new RecursiveCharacterTextSplitter({
@@ -19,7 +19,11 @@ export class RecursiveTextChunker implements TextChunker {
     for (const section of sections) {
       for (const text of await this.splitter.splitText(section.text)) {
         if (text.trim() !== "") {
-          chunks.push(section.page === undefined ? { text } : { text, page: section.page });
+          chunks.push({
+            text,
+            ...(section.page === undefined ? {} : { page: section.page }),
+            ...(section.startSeconds === undefined ? {} : { startSeconds: section.startSeconds }),
+          });
         }
       }
     }

@@ -296,6 +296,7 @@ describe("manage connections API (Postgres and Weaviate local, fake embeddings)"
       expect(Object.keys(body.connections[0] ?? {}).sort()).toEqual([
         "chunkCount",
         "createdAt",
+        "durationSeconds",
         "errorCode",
         "id",
         "kind",

@@ -4,6 +4,7 @@ import { cn } from "@repo/ui/lib/utils";
 import { type AttachmentView, useAttachments } from "./use-attachments";
 
 const PHASE_TEXT = {
+  waiting: "Waiting for its turn…",
   uploading: "Uploading…",
   processing: "Processing…",
   ready: "Ready",
@@ -32,6 +33,9 @@ function Chip({ attachment }: { attachment: AttachmentView }) {
         <span role="status" className="flex items-center gap-1 text-muted-foreground">
           {phase === "ready" ? null : <Spinner className="size-4" />}
           {PHASE_TEXT[phase]}
+          {attachment.media && phase === "processing" ? (
+            <span className="font-normal">This can take a few minutes.</span>
+          ) : null}
         </span>
       )}
       <span className="ml-auto flex gap-1">

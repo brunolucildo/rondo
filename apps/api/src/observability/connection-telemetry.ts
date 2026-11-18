@@ -12,7 +12,10 @@ import { baseLogger } from "./logger";
 
 const METER_NAME = "rondo-api";
 
-export type ConnectionIngestionKind = "pdf" | "txt" | "md" | "url";
+/** Processing a minute of media takes seconds to a few minutes: the default buckets stop at 10 s. */
+const MEDIA_PER_MINUTE_BUCKETS_SECONDS = [0.5, 1, 2, 3, 5, 7.5, 10, 15, 20, 30, 60, 120];
+
+export type ConnectionIngestionKind = "pdf" | "txt" | "md" | "image" | "url" | "audio" | "video";
 export type ConnectionIngestionOutcome = "success" | "failure";
 
 /** Closed set for the `reason` of a failed ingestion (the lower-case error codes). */
@@ -27,7 +30,9 @@ export type ConnectionIngestionReason =
   | "fetch_timeout"
   | "response_too_large"
   | "unsupported_content_type"
-  | "too_many_redirects";
+  | "too_many_redirects"
+  | "media_unreadable"
+  | "content_not_processable";
 
 export interface ConnectionIngestionResult {
   outcome: ConnectionIngestionOutcome;
@@ -35,6 +40,8 @@ export interface ConnectionIngestionResult {
   /** True when the content was already connected and nothing was processed. */
   deduplicated: boolean;
   chunkCount: number;
+  /** Seconds of audio or video processed (spec 0028); absent for the other kinds. */
+  mediaSeconds?: number;
 }
 
 function createInstruments() {
@@ -50,9 +57,33 @@ function createInstruments() {
       unit: "s",
       advice: { explicitBucketBoundaries: DURATION_BUCKETS_SECONDS },
     }),
+    vision: meter.createHistogram("connection.vision.duration", {
+      description: "Time of one call to the vision model (spec 0026), by outcome.",
+      unit: "s",
+      advice: { explicitBucketBoundaries: DURATION_BUCKETS_SECONDS },
+    }),
     deletions: meter.createCounter("connection.deletions", {
       description: "Connection deletion requests (spec 0025), by scope and outcome.",
       unit: "{deletion}",
+    }),
+    mediaMinutes: meter.createCounter("connection.media.minutes", {
+      description:
+        "Minutes of audio and video sent to be processed (spec 0028), by kind and outcome.",
+      unit: "min",
+    }),
+    mediaProcessingPerMinute: meter.createHistogram(
+      "connection.media.processing_per_media_minute",
+      {
+        description:
+          "Seconds spent processing one minute of audio or video (spec 0028), by kind and outcome.",
+        unit: "s",
+        advice: { explicitBucketBoundaries: MEDIA_PER_MINUTE_BUCKETS_SECONDS },
+      },
+    ),
+    mediaCleanups: meter.createCounter("connection.media.cleanups", {
+      description:
+        "Deletions of the file sent to the media provider (spec 0028), by outcome: deleted, pending (failed, retried later) or retried.",
+      unit: "{cleanup}",
     }),
     urlBlocked: meter.createCounter("url_fetch.blocked", {
       description: "Links refused by the egress rules (spec 0027), by reason.",
@@ -73,6 +104,17 @@ function getInstruments() {
   instruments ??= createInstruments();
 
   return instruments;
+}
+
+export type VisionCallOutcome = "success" | "refused" | "unavailable";
+
+/** Duration of one call to the vision model (spec 0026): the outcome only, never the image or its text. Never throws. */
+export function recordVisionCall(outcome: VisionCallOutcome, durationSeconds: number): void {
+  try {
+    getInstruments().vision.record(durationSeconds, { outcome });
+  } catch {
+    // Telemetry must never change the answer.
+  }
 }
 
 export type UrlBlockMetricReason = "scheme" | "port" | "credentials" | "address" | "redirect";
@@ -154,6 +196,25 @@ export function recordConnectionDeletion(
   }
 }
 
+export type MediaCleanupOutcome = "deleted" | "pending" | "retried";
+
+/**
+ * Counter and log of the deletion of a file at the media provider (spec 0028, R4): only the
+ * outcome, never the provider's file name or anything of the file. A `pending` one is repeated by
+ * the next sweep. Never throws.
+ */
+export function recordMediaCleanup(outcome: MediaCleanupOutcome, pending: number): void {
+  try {
+    getInstruments().mediaCleanups.add(1, { outcome });
+
+    if (outcome === "pending") {
+      baseLogger.warn({ event: "media_cleanup_pending", pending }, "media_cleanup_pending");
+    }
+  } catch {
+    // Telemetry must never change the answer.
+  }
+}
+
 /** Counter, histogram and `connection_ingested` log of one finished ingestion. Never throws. */
 export function recordConnectionIngestion(
   kind: ConnectionIngestionKind,
@@ -171,6 +232,15 @@ export function recordConnectionIngestion(
     ingestions.add(1, attributes);
     duration.record(durationSeconds, attributes);
 
+    if (result.mediaSeconds !== undefined && result.mediaSeconds > 0) {
+      const minutes = result.mediaSeconds / 60;
+      const { mediaMinutes, mediaProcessingPerMinute } = getInstruments();
+      const mediaAttributes = { outcome: result.outcome, kind };
+
+      mediaMinutes.add(minutes, mediaAttributes);
+      mediaProcessingPerMinute.record(durationSeconds / minutes, mediaAttributes);
+    }
+
     const fields = {
       event: "connection_ingested",
       kind,
@@ -178,6 +248,7 @@ export function recordConnectionIngestion(
       reason: result.reason,
       deduplicated: result.deduplicated,
       chunkCount: result.chunkCount,
+      ...(result.mediaSeconds === undefined ? {} : { mediaSeconds: result.mediaSeconds }),
       durationMs: Math.round(durationSeconds * 1000),
     };
 

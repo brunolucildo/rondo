@@ -14,6 +14,12 @@ import {
   START,
   StateGraph,
 } from "@langchain/langgraph";
+import {
+  modelFailureReason,
+  traceExpertNode,
+  traceModelCall,
+} from "../../../observability/agent-telemetry";
+import { recordExpertGrounded } from "../../../observability/expert-telemetry";
 import type { ModelMessage } from "../domain/expert-conversation";
 import { ExpertKnowledgeUnavailableError, ExpertModelError } from "../domain/expert-errors";
 import type {
@@ -122,63 +128,84 @@ export class LangGraphExpertOrchestrator implements ExpertOrchestrator {
   private readonly graph;
 
   constructor(model: BaseChatModel, retriever?: KnowledgeRetriever) {
-    const retrieve = async (
+    // Each node runs inside its own span (`expert.retrieve`, `expert.generate`); the retrieval,
+    // the embeddings, the index and the model call open their own children under it.
+    const retrieve = (
       state: typeof ExpertState.State,
       config: LangGraphRunnableConfig,
-    ): Promise<{ grounding: Grounding | null }> => {
-      const request = state.retrieval;
+    ): Promise<{ grounding: Grounding | null }> =>
+      traceExpertNode(
+        "expert.retrieve",
+        config.signal,
+        async () => {
+          const request = state.retrieval;
 
-      if (request === null || request === undefined) {
-        return { grounding: null };
-      }
+          if (request === null || request === undefined) {
+            recordExpertGrounded("skipped");
 
-      if (retriever === undefined) {
-        throw new ExpertKnowledgeUnavailableError();
-      }
+            return { grounding: null };
+          }
 
-      const chunks = await retriever.retrieve(
-        request,
-        config.signal ?? new AbortController().signal,
+          if (retriever === undefined) {
+            throw new ExpertKnowledgeUnavailableError();
+          }
+
+          const chunks = await retriever.retrieve(
+            request,
+            config.signal ?? new AbortController().signal,
+          );
+
+          recordExpertGrounded(chunks.length > 0 ? "yes" : "gap");
+          config.writer?.({
+            type: "citations",
+            citations: buildCitations(chunks),
+          } satisfies OrchestratorEvent);
+
+          return { grounding: { chunks, scoped: request.connectionIds !== null } };
+        },
+        (error) =>
+          error instanceof ExpertKnowledgeUnavailableError ? "knowledge_unavailable" : "unknown",
       );
 
-      config.writer?.({
-        type: "citations",
-        citations: buildCitations(chunks),
-      } satisfies OrchestratorEvent);
+    const respond = (state: typeof ExpertState.State, config: LangGraphRunnableConfig) =>
+      traceExpertNode(
+        "expert.generate",
+        config.signal,
+        () =>
+          traceModelCall("openai", config.signal, async (span) => {
+            let answer: AIMessageChunk | undefined;
+            const prompt =
+              state.grounding === null || state.grounding === undefined
+                ? state.messages
+                : applyGrounding(state.messages.map(toModelMessage), state.grounding).map(
+                    toLangChainMessage,
+                  );
 
-      return { grounding: { chunks, scoped: request.connectionIds !== null } };
-    };
+            for await (const chunk of await model.stream(prompt, config)) {
+              answer = answer === undefined ? chunk : answer.concat(chunk);
 
-    const respond = async (state: typeof ExpertState.State, config: LangGraphRunnableConfig) => {
-      let answer: AIMessageChunk | undefined;
-      const prompt =
-        state.grounding === null || state.grounding === undefined
-          ? state.messages
-          : applyGrounding(state.messages.map(toModelMessage), state.grounding).map(
-              toLangChainMessage,
-            );
+              const text = textOf(chunk);
 
-      for await (const chunk of await model.stream(prompt, config)) {
-        answer = answer === undefined ? chunk : answer.concat(chunk);
+              if (text !== "") {
+                config.writer?.({ type: "text", text } satisfies OrchestratorEvent);
+              }
+            }
 
-        const text = textOf(chunk);
+            const usage = answer?.usage_metadata;
 
-        if (text !== "") {
-          config.writer?.({ type: "text", text } satisfies OrchestratorEvent);
-        }
-      }
+            if (usage !== undefined) {
+              span.setAttribute("gen_ai.usage.input_tokens", usage.input_tokens);
+              span.setAttribute("gen_ai.usage.output_tokens", usage.output_tokens);
+              config.writer?.({
+                type: "usage",
+                usage: { inputTokens: usage.input_tokens, outputTokens: usage.output_tokens },
+              } satisfies OrchestratorEvent);
+            }
 
-      const usage = answer?.usage_metadata;
-
-      if (usage !== undefined) {
-        config.writer?.({
-          type: "usage",
-          usage: { inputTokens: usage.input_tokens, outputTokens: usage.output_tokens },
-        } satisfies OrchestratorEvent);
-      }
-
-      return { messages: answer === undefined ? [] : [answer] };
-    };
+            return { messages: answer === undefined ? [] : [answer] };
+          }),
+        modelFailureReason,
+      );
 
     this.graph = new StateGraph(ExpertState)
       .addNode("retrieve", retrieve)

@@ -26,7 +26,7 @@ export class UploadExceptionFilter implements ExceptionFilter {
         new ApiException(
           HttpStatus.PAYLOAD_TOO_LARGE,
           "FILE_TOO_LARGE",
-          "The file is larger than 20 MB.",
+          "The file is larger than 200 MB.",
         ),
         host,
       );

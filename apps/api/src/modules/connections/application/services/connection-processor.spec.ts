@@ -52,8 +52,12 @@ function setup(
     embeddings?: EmbeddingsGenerator;
     index?: KnowledgeIndex;
     chunker?: TextChunker;
+    mediaChunker?: TextChunker;
     extractionTimeoutMs?: number;
+    mediaExtractionTimeoutMs?: number;
     concurrency?: number;
+    mediaConcurrency?: number;
+    maxWaitingMediaJobs?: number;
   } = {},
 ) {
   const repository = new InMemoryConnectionRepository();
@@ -65,13 +69,24 @@ function setup(
   const extractor: DocumentExtractor = { extract };
   const processor = new ConnectionProcessor({
     repository,
-    extractors: { pdf: extractor, txt: extractor, md: extractor },
+    extractors: {
+      pdf: extractor,
+      txt: extractor,
+      md: extractor,
+      image: extractor,
+      audio: extractor,
+      video: extractor,
+    },
     chunker: options.chunker ?? new RecursiveTextChunker(),
     embeddings,
     index,
     telemetry,
+    mediaChunker: options.mediaChunker,
     extractionTimeoutMs: options.extractionTimeoutMs,
+    mediaExtractionTimeoutMs: options.mediaExtractionTimeoutMs,
     concurrency: options.concurrency,
+    mediaConcurrency: options.mediaConcurrency,
+    maxWaitingMediaJobs: options.maxWaitingMediaJobs,
   });
 
   async function connect(kind: Connection["kind"] = "pdf", userId = USER_ID) {

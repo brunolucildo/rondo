@@ -8,6 +8,8 @@ export interface RetrievedChunk {
   position: number;
   /** One-based page, when the source has pages. */
   page?: number;
+  /** Second of the audio or video the chunk starts at (spec 0028). */
+  startSeconds?: number;
   text: string;
   /** Cosine similarity to the question (higher is closer). */
   score: number;
@@ -23,6 +25,11 @@ export interface Citation {
   sourceName: string;
   page: number | null;
   position: number;
+  /**
+   * Second the cited passage of an audio or video starts at (spec 0028). Absent for the other
+   * kinds, so their citations do not change.
+   */
+  startSeconds?: number;
 }
 
 /** What the retrieval found for one question. */
@@ -36,13 +43,14 @@ export interface Grounding {
 /**
  * One citation per source and page, in the order of the best chunk of each. The `position` is the
  * one of the chunk with the highest similarity inside that source and page; a source without
- * pages (TXT, Markdown) collapses into a single citation.
+ * pages (TXT, Markdown) collapses into a single citation. An audio or a video has no pages but a
+ * timeline: each passage (start second) is its own citation, so the person can check each instant.
  */
 export function buildCitations(chunks: readonly RetrievedChunk[]): Citation[] {
   const best = new Map<string, RetrievedChunk>();
 
   for (const chunk of chunks) {
-    const key = `${chunk.connectionId}|${chunk.page ?? "none"}`;
+    const key = `${chunk.connectionId}|${chunk.page ?? "none"}|${chunk.startSeconds ?? "none"}`;
     const current = best.get(key);
 
     if (current === undefined || chunk.score > current.score) {
@@ -57,6 +65,7 @@ export function buildCitations(chunks: readonly RetrievedChunk[]): Citation[] {
       sourceName: chunk.sourceName,
       page: chunk.page ?? null,
       position: chunk.position,
+      ...(chunk.startSeconds === undefined ? {} : { startSeconds: chunk.startSeconds }),
     }));
 }
 
@@ -135,7 +144,7 @@ export function applyGrounding(
 
 /**
  * Reads a stored citation list defensively (the value comes from a `jsonb` column). Keeps only
- * the four known keys, so nothing else a row may hold (chunk text included) can ever reach a
+ * the known keys (the four of 0024 and, for media, `startSeconds`), so nothing else a row may hold (chunk text included) can ever reach a
  * response. Returns `undefined` for a value that is not a list of well-formed citations.
  */
 export function parseStoredCitations(value: unknown): Citation[] | null | undefined {
@@ -154,13 +163,19 @@ export function parseStoredCitations(value: unknown): Citation[] | null | undefi
       return undefined;
     }
 
-    const { connectionId, sourceName, page, position } = item as Record<string, unknown>;
+    const { connectionId, sourceName, page, position, startSeconds } = item as Record<
+      string,
+      unknown
+    >;
 
     if (
       typeof connectionId !== "string" ||
       typeof sourceName !== "string" ||
       (page !== null && !Number.isInteger(page)) ||
-      !Number.isInteger(position)
+      !Number.isInteger(position) ||
+      (startSeconds !== undefined &&
+        startSeconds !== null &&
+        (!Number.isInteger(startSeconds) || (startSeconds as number) < 0))
     ) {
       return undefined;
     }
@@ -170,6 +185,7 @@ export function parseStoredCitations(value: unknown): Citation[] | null | undefi
       sourceName,
       page: page as number | null,
       position: position as number,
+      ...(typeof startSeconds === "number" ? { startSeconds } : {}),
     });
   }
 

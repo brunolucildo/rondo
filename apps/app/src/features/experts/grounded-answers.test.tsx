@@ -157,6 +157,41 @@ describe("the Sources of an answer (R9)", () => {
     expect(within(log()).getByText("Plan says 40 minutes.")).toBeInTheDocument();
   });
 
+  it("shows the instant of an audio or video source as mm:ss, and leaves the sources without one alone (spec 0028)", async () => {
+    stubApi(() =>
+      answer("The coach explains the exit.", [
+        citation({
+          sourceName: "analysis.mp4",
+          page: null,
+          connectionId: "video",
+          startSeconds: 750,
+        }),
+        citation({ sourceName: "talk.mp3", page: null, connectionId: "audio", startSeconds: 3723 }),
+        citation({ sourceName: "early.mp3", page: null, connectionId: "early", startSeconds: 0 }),
+        citation(),
+      ]),
+    );
+
+    const user = userEvent.setup();
+
+    await openHome();
+    await user.type(textbox(), "What did the coach say?");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+
+    const sources = await screen.findByRole("region", { name: "Sources" });
+
+    expect(
+      within(sources)
+        .getAllByRole("listitem")
+        .map((item) => item.textContent),
+    ).toEqual([
+      "analysis.mp4 · 12:30",
+      "talk.mp3 · 1:02:03",
+      "early.mp3 · 00:00",
+      "plano.pdf, page 2",
+    ]);
+  });
+
   it("shows the notice and no list when no connected source covers the question", async () => {
     stubApi(() => answer("No connected source covers this question.", []));
 

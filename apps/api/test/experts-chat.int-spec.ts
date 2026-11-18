@@ -200,6 +200,9 @@ describe("experts chat on the real graph with the scripted model", () => {
       "outputTokens",
       "reason",
       "requestId",
+      // Spec 0029 (R5): the ids of the answer span, so the log opens its trace.
+      "span_id",
+      "trace_id",
     ]);
   });
 

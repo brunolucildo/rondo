@@ -1,3 +1,5 @@
+import { SpanKind } from "@opentelemetry/api";
+import { recordDependencyCall } from "../../../observability/agent-telemetry";
 import {
   failureReasonOf,
   type KnowledgeFailureReason,
@@ -75,21 +77,25 @@ export class InstrumentedKnowledgeIndex implements KnowledgeIndex {
     try {
       return await traceKnowledge(
         `knowledge.index.${operation}`,
-        { "knowledge.operation": operation },
+        {
+          "knowledge.operation": operation,
+          "db.system.name": "weaviate",
+          "db.operation.name": operation,
+        },
         run,
         reasonOf,
+        SpanKind.CLIENT,
       );
     } catch (error) {
       reason = reasonOf(error);
 
       throw error;
     } finally {
-      recordKnowledgeIndexCall({
-        operation,
-        outcome: reason === "none" ? "success" : "failure",
-        reason,
-        durationSeconds: (performance.now() - startedAt) / 1000,
-      });
+      const durationSeconds = (performance.now() - startedAt) / 1000;
+      const outcome = reason === "none" ? "success" : "failure";
+
+      recordKnowledgeIndexCall({ operation, outcome, reason, durationSeconds });
+      recordDependencyCall("weaviate", outcome, reason, durationSeconds);
     }
   }
 }
@@ -111,18 +117,23 @@ export class InstrumentedEmbeddingsGenerator implements EmbeddingsGenerator {
     let reason: KnowledgeFailureReason | "none" = "none";
 
     try {
-      return await run();
+      return await traceKnowledge(
+        "gen_ai.embeddings",
+        { "gen_ai.operation.name": "embeddings", "gen_ai.provider.name": "openai" },
+        run,
+        reasonOf,
+        SpanKind.CLIENT,
+      );
     } catch (error) {
       reason = reasonOf(error);
 
       throw error;
     } finally {
-      recordEmbeddingsCall({
-        outcome: reason === "none" ? "success" : "failure",
-        reason,
-        texts,
-        durationSeconds: (performance.now() - startedAt) / 1000,
-      });
+      const durationSeconds = (performance.now() - startedAt) / 1000;
+      const outcome = reason === "none" ? "success" : "failure";
+
+      recordEmbeddingsCall({ outcome, reason, texts, durationSeconds });
+      recordDependencyCall("openai", outcome, reason, durationSeconds);
     }
   }
 }

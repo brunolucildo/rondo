@@ -1,7 +1,7 @@
 import type { Connection } from "../../domain/connection";
 import { ConnectionNotFoundError } from "../../domain/connection-errors";
 import type { ConnectionRepository } from "../../domain/connection-ports";
-import { isStaleProcessing, STALE_PROCESSING_MS } from "../../domain/connection-rules";
+import { isStaleProcessing, staleProcessingMsOf } from "../../domain/connection-rules";
 
 export interface GetConnectionInput {
   /** From the session, never from the request. */
@@ -31,7 +31,7 @@ export class GetConnection {
       return connection;
     }
 
-    const cutoff = new Date(this.now().getTime() - STALE_PROCESSING_MS);
+    const cutoff = new Date(this.now().getTime() - staleProcessingMsOf(connection.kind));
 
     return (
       (await this.repository.failIfStale(userId, connectionId, cutoff, "PROCESSING_UNAVAILABLE")) ??

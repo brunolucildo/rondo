@@ -46,6 +46,13 @@ export function assertChunks(chunks: readonly KnowledgeChunk[]): void {
       throw new KnowledgeInputError("page");
     }
 
+    if (
+      chunk.startSeconds !== undefined &&
+      (!Number.isInteger(chunk.startSeconds) || chunk.startSeconds < 0)
+    ) {
+      throw new KnowledgeInputError("startSeconds");
+    }
+
     if (typeof chunk.text !== "string" || chunk.text.length === 0) {
       throw new KnowledgeInputError("text");
     }

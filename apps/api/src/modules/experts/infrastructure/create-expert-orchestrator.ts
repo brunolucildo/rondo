@@ -1,4 +1,5 @@
 import { ChatOpenAI } from "@langchain/openai";
+import { disableLangSmithTracing } from "../../../observability/langsmith-guard";
 import type { ExpertChatConfig } from "../domain/expert-chat-config";
 import type { ExpertOrchestrator, KnowledgeRetriever } from "../domain/expert-ports";
 import { LangGraphExpertOrchestrator } from "./langgraph-expert-orchestrator";
@@ -13,6 +14,9 @@ export function createExpertOrchestrator(
   config: ExpertChatConfig,
   retriever: KnowledgeRetriever,
 ): ExpertOrchestrator {
+  // Before any model or graph exists: the LangChain tracing to LangSmith stays off (spec 0029).
+  disableLangSmithTracing();
+
   switch (config.provider) {
     case "openai":
       return new LangGraphExpertOrchestrator(

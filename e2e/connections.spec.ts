@@ -134,7 +134,9 @@ test.describe("Connections: text files", () => {
     await openHome(page, "connections-fake");
     await attach(page, "fake.pdf", "application/pdf", Buffer.from("MZ this is not a pdf"));
 
-    await expect(page.getByText("Only PDF, TXT and Markdown files are supported.")).toBeVisible();
+    await expect(
+      page.getByText("Only PDF, TXT, Markdown, JPG, PNG, MP3 and MP4 files are supported."),
+    ).toBeVisible();
   });
 
   test("shows the privacy notice first, and Cancel uploads nothing", async ({ page }) => {

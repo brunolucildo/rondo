@@ -21,7 +21,7 @@ describe("kindOfFileName", () => {
     expect(kindOfFileName(name)).toBe(kind);
   });
 
-  it.each(["virus.exe", "picture.png", "noextension", "pdf", "trailing.", "doc.pdf.exe"])(
+  it.each(["virus.exe", "picture.gif", "noextension", "pdf", "trailing.", "doc.pdf.exe"])(
     "refuses %s",
     (name) => {
       expect(kindOfFileName(name)).toBeNull();

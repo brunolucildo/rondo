@@ -9,7 +9,11 @@ import type {
   ConnectionTelemetry,
   DeletionOutcome,
 } from "../../domain/connection-ports";
-import { isStaleProcessing, STALE_PROCESSING_MS } from "../../domain/connection-rules";
+import {
+  isStaleProcessing,
+  STALE_MEDIA_PROCESSING_MS,
+  STALE_PROCESSING_MS,
+} from "../../domain/connection-rules";
 
 export interface DeleteConnectionInput {
   /** From the session, never from the request. */
@@ -81,8 +85,9 @@ export class DeleteConnection {
     }
 
     const staleBefore = new Date(this.now().getTime() - STALE_PROCESSING_MS);
+    const mediaStaleBefore = new Date(this.now().getTime() - STALE_MEDIA_PROCESSING_MS);
 
-    if (await this.repository.deleteSettled(userId, connectionId, staleBefore)) {
+    if (await this.repository.deleteSettled(userId, connectionId, staleBefore, mediaStaleBefore)) {
       return;
     }
 

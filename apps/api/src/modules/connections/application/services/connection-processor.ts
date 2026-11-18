@@ -1,5 +1,10 @@
 import type { EmbeddingsGenerator, KnowledgeIndex } from "../../../knowledge";
-import type { Connection, ConnectionErrorCode, FileConnectionKind } from "../../domain/connection";
+import type {
+  Connection,
+  ConnectionErrorCode,
+  ConnectionKind,
+  FileConnectionKind,
+} from "../../domain/connection";
 import { ConnectionProcessingError } from "../../domain/connection-errors";
 import type {
   ConnectionRepository,
@@ -11,12 +16,28 @@ import type {
 } from "../../domain/connection-ports";
 import {
   EXTRACTION_TIMEOUT_MS,
+  IMAGE_EXTRACTION_TIMEOUT_MS,
+  isMediaKind,
   MAX_CHUNKS_PER_CONNECTION,
+  MAX_WAITING_MEDIA_JOBS,
+  MEDIA_CONCURRENCY,
+  MEDIA_EXTRACTION_TIMEOUT_MS,
   PROCESSING_CONCURRENCY,
 } from "../../domain/connection-rules";
 
 /** Jobs waiting for a slot: each holds its file in memory, so the wait line is short on purpose. */
 const MAX_WAITING_JOBS = 20;
+
+/**
+ * Documents and media have their own lanes: a media waits minutes for the provider (little CPU) and
+ * must not hold the slots a PDF needs, and a media holds up to 200 MB, so its lane is narrow.
+ */
+interface Lane {
+  waiting: ProcessRequest[];
+  running: Set<Promise<void>>;
+  concurrency: number;
+  maxWaiting: number;
+}
 
 export interface ConnectionProcessorDependencies {
   repository: ConnectionRepository;
@@ -25,8 +46,13 @@ export interface ConnectionProcessorDependencies {
   embeddings: EmbeddingsGenerator;
   index: KnowledgeIndex;
   telemetry: ConnectionTelemetry;
+  /** Chunker of audio and video: it keeps the start of each chunk (spec 0028). Defaults to `chunker`. */
+  mediaChunker?: TextChunker;
   extractionTimeoutMs?: number;
+  mediaExtractionTimeoutMs?: number;
   concurrency?: number;
+  mediaConcurrency?: number;
+  maxWaitingMediaJobs?: number;
 }
 
 export interface ProcessRequest {
@@ -72,19 +98,38 @@ function errorCodeOf(error: unknown): ConnectionErrorCode {
  * leaves partial chunks behind. Nothing here logs or puts content in an error.
  */
 export class ConnectionProcessor {
-  private readonly waiting: ProcessRequest[] = [];
-  private readonly running = new Set<Promise<void>>();
-  private readonly extractionTimeoutMs: number;
-  private readonly concurrency: number;
+  private readonly lanes: { document: Lane; media: Lane };
+  private readonly extractionTimeoutMs: number | undefined;
+  private readonly mediaExtractionTimeoutMs: number;
 
   constructor(private readonly deps: ConnectionProcessorDependencies) {
-    this.extractionTimeoutMs = deps.extractionTimeoutMs ?? EXTRACTION_TIMEOUT_MS;
-    this.concurrency = deps.concurrency ?? PROCESSING_CONCURRENCY;
+    this.extractionTimeoutMs = deps.extractionTimeoutMs;
+    this.mediaExtractionTimeoutMs = deps.mediaExtractionTimeoutMs ?? MEDIA_EXTRACTION_TIMEOUT_MS;
+    this.lanes = {
+      document: {
+        waiting: [],
+        running: new Set(),
+        concurrency: deps.concurrency ?? PROCESSING_CONCURRENCY,
+        maxWaiting: MAX_WAITING_JOBS,
+      },
+      media: {
+        waiting: [],
+        running: new Set(),
+        concurrency: deps.mediaConcurrency ?? MEDIA_CONCURRENCY,
+        maxWaiting: deps.maxWaitingMediaJobs ?? MAX_WAITING_MEDIA_JOBS,
+      },
+    };
+  }
+
+  private laneOf(kind: ConnectionKind): Lane {
+    return isMediaKind(kind) ? this.lanes.media : this.lanes.document;
   }
 
   /** Schedules the job. Never throws and never waits for it. */
   enqueue(request: ProcessRequest): void {
-    if (this.waiting.length >= MAX_WAITING_JOBS) {
+    const lane = this.laneOf(request.connection.kind);
+
+    if (lane.waiting.length >= lane.maxWaiting) {
       void this.deps.repository
         .markFailed(request.userId, request.connection.id, "PROCESSING_UNAVAILABLE")
         .catch(() => undefined);
@@ -92,20 +137,22 @@ export class ConnectionProcessor {
       return;
     }
 
-    this.waiting.push(request);
-    this.pump();
+    lane.waiting.push(request);
+    this.pump(lane);
   }
 
   /** Resolves when every job started so far has ended (for tests and for shutdown). */
   async idle(): Promise<void> {
-    while (this.running.size > 0 || this.waiting.length > 0) {
-      await Promise.allSettled(this.running);
+    const lanes = Object.values(this.lanes);
+
+    while (lanes.some((lane) => lane.running.size > 0 || lane.waiting.length > 0)) {
+      await Promise.allSettled(lanes.flatMap((lane) => [...lane.running]));
     }
   }
 
-  private pump(): void {
-    while (this.running.size < this.concurrency) {
-      const next = this.waiting.shift();
+  private pump(lane: Lane): void {
+    while (lane.running.size < lane.concurrency) {
+      const next = lane.waiting.shift();
 
       if (next === undefined) {
         return;
@@ -114,16 +161,20 @@ export class ConnectionProcessor {
       const job: Promise<void> = this.run(next)
         .catch(() => undefined)
         .finally(() => {
-          this.running.delete(job);
-          this.pump();
+          lane.running.delete(job);
+          this.pump(lane);
         });
 
-      this.running.add(job);
+      lane.running.add(job);
     }
   }
 
   private async run(request: ProcessRequest): Promise<void> {
     const { userId, connection } = request;
+    const mediaSeconds =
+      isMediaKind(connection.kind) && connection.durationSeconds != null
+        ? { mediaSeconds: connection.durationSeconds }
+        : {};
 
     await this.deps.telemetry.traceIngestion(
       connection.kind,
@@ -133,7 +184,13 @@ export class ConnectionProcessor {
 
           await this.deps.repository.markReady(userId, connection.id, chunkCount);
 
-          return { outcome: "success", reason: "none", deduplicated: false, chunkCount };
+          return {
+            outcome: "success",
+            reason: "none",
+            deduplicated: false,
+            chunkCount,
+            ...mediaSeconds,
+          };
         } catch (error) {
           const code = errorCodeOf(error);
 
@@ -145,6 +202,7 @@ export class ConnectionProcessor {
             reason: code.toLowerCase() as Lowercase<ConnectionErrorCode>,
             deduplicated: false,
             chunkCount: 0,
+            ...mediaSeconds,
           };
         }
       },
@@ -158,12 +216,18 @@ export class ConnectionProcessor {
     sections: extracted,
     clearFirst,
   }: ProcessRequest): Promise<number> {
-    const { extractors, chunker, embeddings, index } = this.deps;
+    const { extractors, embeddings, index } = this.deps;
+    const media = isMediaKind(connection.kind);
+    const chunker = media ? (this.deps.mediaChunker ?? this.deps.chunker) : this.deps.chunker;
+    // A link arrives with its text already extracted (spec 0027); a file is read by its extractor.
     const sections =
       extracted ??
       (await withTimeout(
         extractors[connection.kind as FileConnectionKind].extract(bytes),
-        this.extractionTimeoutMs,
+        media
+          ? this.mediaExtractionTimeoutMs
+          : (this.extractionTimeoutMs ??
+              (connection.kind === "image" ? IMAGE_EXTRACTION_TIMEOUT_MS : EXTRACTION_TIMEOUT_MS)),
       ));
     const chunks = await chunker.chunk(sections);
 
@@ -192,6 +256,7 @@ export class ConnectionProcessor {
         sourceName: connection.name,
         position,
         ...(chunk.page === undefined ? {} : { page: chunk.page }),
+        ...(chunk.startSeconds === undefined ? {} : { startSeconds: chunk.startSeconds }),
         text: chunk.text,
         vector: vectors[position] ?? [],
       })),
