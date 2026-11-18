@@ -97,7 +97,8 @@ export function Composer({
 
   return (
     <div className="sticky bottom-0 z-10 border-t-2 border-border bg-card pb-[env(safe-area-inset-bottom)]">
-      <div className="absolute bottom-full right-4 mb-3 flex max-w-[calc(100%-2rem)] flex-wrap justify-end gap-2">
+      {/* In the flow (not floating over the messages): the buttons never cover the conversation. */}
+      <div className="mx-auto flex w-full max-w-3xl flex-wrap justify-end gap-2 px-4 pt-3">
         <ConnectionsButton />
         <AddConnectionButton />
         <AddLinkButton />
