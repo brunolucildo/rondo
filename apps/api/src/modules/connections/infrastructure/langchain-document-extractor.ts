@@ -9,10 +9,13 @@ import type { ConnectionKind } from "../domain/connection";
 import { ConnectionProcessingError } from "../domain/connection-errors";
 import type { DocumentExtractor, ExtractedSection } from "../domain/connection-ports";
 
+/** The kinds read by a document loader; images go through `ImageDocumentExtractor`. */
+export type LoaderKind = Exclude<ConnectionKind, "image">;
+
 type LoaderFactory = (filePath: string) => BaseDocumentLoader;
 
 /** One loader per kind: TXT and Markdown are plain text; PDF goes through `pdf-parse`. */
-const LOADERS: Readonly<Record<ConnectionKind, LoaderFactory>> = {
+const LOADERS: Readonly<Record<LoaderKind, LoaderFactory>> = {
   pdf: (filePath) => new PDFLoader(filePath, { splitPages: true }),
   txt: (filePath) => new TextLoader(filePath),
   md: (filePath) => new TextLoader(filePath),
@@ -41,7 +44,7 @@ const PAGE_NUMBER = (metadata: Record<string, unknown>): number | undefined => {
   return undefined;
 };
 
-function classify(kind: ConnectionKind, error: unknown): unknown {
+function classify(kind: LoaderKind, error: unknown): unknown {
   if (kind !== "pdf" || typeof error !== "object" || error === null || !("name" in error)) {
     return error;
   }
@@ -65,7 +68,7 @@ function classify(kind: ConnectionKind, error: unknown): unknown {
  */
 export class LangChainDocumentExtractor implements DocumentExtractor {
   constructor(
-    private readonly kind: ConnectionKind,
+    private readonly kind: LoaderKind,
     private readonly workRoot: string = tmpdir(),
   ) {}
 

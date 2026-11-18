@@ -4,7 +4,7 @@ import { ACCEPTED_EXTENSIONS } from "./connection-messages";
 import { useAttachments } from "./use-attachments";
 
 /**
- * The floating "Add connection" button: it opens the file picker (PDF, TXT and Markdown). It is a
+ * The floating "Add connection" button: it opens the file picker (PDF, TXT, Markdown, JPG and PNG). It is a
  * real button (keyboard and screen reader friendly), 44 px high; the parent positions it above the
  * composer. The chosen file becomes a chip; the privacy notice comes first on the first use.
  */

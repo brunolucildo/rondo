@@ -186,7 +186,7 @@ function viewOf(item: Attachment, connection: ConnectionDto | undefined): Attach
   }
 
   if (connection?.status === "failed") {
-    const failure = describeProcessingFailure(connection.errorCode);
+    const failure = describeProcessingFailure(connection.errorCode, connection.kind);
 
     return { ...base, phase: "failed", message: failure.text, canRetry: failure.retryable };
   }
@@ -231,7 +231,7 @@ export function AttachmentsProvider({ children }: { children: ReactNode }) {
         queryClient.setQueryData(["connections", connection.id], connection);
         dispatch({ type: "sent", id, connectionId: connection.id });
       } catch (error) {
-        dispatch({ type: "rejected", id, rejection: describeUploadFailure(error) });
+        dispatch({ type: "rejected", id, rejection: describeUploadFailure(error, file.name) });
       }
     },
     [mutateAsync, queryClient],

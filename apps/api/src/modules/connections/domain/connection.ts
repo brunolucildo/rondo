@@ -1,5 +1,5 @@
-/** Kinds of connection this slice can ingest. Images, URLs, audio and video come in phase 2. */
-export const CONNECTION_KINDS = ["pdf", "txt", "md"] as const;
+/** Kinds of connection this slice can ingest. URLs, audio and video come in phase 2. */
+export const CONNECTION_KINDS = ["pdf", "txt", "md", "image"] as const;
 
 export type ConnectionKind = (typeof CONNECTION_KINDS)[number];
 
@@ -11,6 +11,7 @@ export const CONNECTION_ERROR_CODES = [
   "PDF_PROTECTED",
   "TOO_MANY_CHUNKS",
   "PROCESSING_UNAVAILABLE",
+  "CONTENT_NOT_PROCESSABLE",
 ] as const;
 
 export type ConnectionErrorCode = (typeof CONNECTION_ERROR_CODES)[number];

@@ -3,6 +3,21 @@ import type { Connection, ConnectionKind } from "./connection";
 /** Largest accepted file (R2). Also the multipart limit. */
 export const MAX_FILE_BYTES = 20 * 1024 * 1024;
 
+/** Largest accepted image (spec 0026, R1): below the multipart limit, checked by the use case. */
+export const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+
+/** Longest side of an accepted image, in pixels (spec 0026, R1). */
+export const MAX_IMAGE_SIDE_PX = 8000;
+
+/** What the vision model may return for one image, in characters; the rest is cut (spec 0026, R3). */
+export const MAX_IMAGE_TEXT_CHARS = 4000;
+
+/** One call to the vision model may take this long before it counts as a failed attempt (R4). */
+export const VISION_ATTEMPT_TIMEOUT_MS = 30_000;
+
+/** Calls to the vision model per image, the first included (R4). */
+export const VISION_MAX_ATTEMPTS = 2;
+
 /** Connections one user can have (R2). Only a new connection counts: a duplicate is never refused. */
 export const MAX_CONNECTIONS_PER_USER = 50;
 
@@ -15,6 +30,9 @@ export const CHUNK_OVERLAP = 150;
 
 /** Longest the extraction may take before it is given up as `PROCESSING_UNAVAILABLE` (risk table). */
 export const EXTRACTION_TIMEOUT_MS = 60_000;
+
+/** Same limit for an image: it covers the attempts at the vision model plus the wait between them. */
+export const IMAGE_EXTRACTION_TIMEOUT_MS = VISION_MAX_ATTEMPTS * VISION_ATTEMPT_TIMEOUT_MS + 10_000;
 
 /** A `processing` connection older than this lost its worker (API restart): it is `failed` (R6). */
 export const STALE_PROCESSING_MS = 15 * 60_000;
@@ -35,6 +53,9 @@ const KIND_BY_EXTENSION: Readonly<Record<string, ConnectionKind>> = {
   pdf: "pdf",
   txt: "txt",
   md: "md",
+  jpg: "image",
+  jpeg: "image",
+  png: "image",
 };
 
 /**
@@ -47,6 +68,16 @@ const ACCEPTED_CONTENT_TYPES: ReadonlySet<string> = new Set([
   "text/plain",
   "text/markdown",
   "text/x-markdown",
+  "application/octet-stream",
+  "",
+]);
+
+/** Content types of the image formats: the signature of the bytes is the real check. */
+const IMAGE_CONTENT_TYPES: ReadonlySet<string> = new Set([
+  "image/jpeg",
+  "image/jpg",
+  "image/pjpeg",
+  "image/png",
   "application/octet-stream",
   "",
 ]);
@@ -64,10 +95,19 @@ export function kindOfFileName(fileName: string): ConnectionKind | null {
 
 /** Extension and content type, checked before the content is read. */
 export function isAcceptedUpload(fileName: string, contentType: string): boolean {
-  return (
-    kindOfFileName(fileName) !== null &&
-    ACCEPTED_CONTENT_TYPES.has(contentType.split(";")[0]?.trim().toLowerCase() ?? "")
-  );
+  const kind = kindOfFileName(fileName);
+  const type = contentType.split(";")[0]?.trim().toLowerCase() ?? "";
+
+  if (kind === null) {
+    return false;
+  }
+
+  return (kind === "image" ? IMAGE_CONTENT_TYPES : ACCEPTED_CONTENT_TYPES).has(type);
+}
+
+/** The largest file of a kind, in bytes. */
+export function maxBytesOfKind(kind: ConnectionKind): number {
+  return kind === "image" ? MAX_IMAGE_BYTES : MAX_FILE_BYTES;
 }
 
 /**
