@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { validateEnvironment } from "./environment";
+import { loadEnvironment, validateEnvironment } from "./environment";
 
 const validEnv = {
   DATABASE_URL: "postgres://rondo_app:rondo@localhost:5432/rondo",
@@ -103,6 +103,38 @@ describe("validateEnvironment", () => {
     });
   });
 
+  describe("expert chat model", () => {
+    it("uses the scripted fake in test, whatever OPENAI_API_KEY says", () => {
+      expect(validateEnvironment({ ...validEnv, OPENAI_API_KEY: "sk-test" }).expertChat).toEqual({
+        provider: "fake",
+      });
+    });
+
+    it("boots without OPENAI_API_KEY and reports the experts as unavailable", () => {
+      const env = {
+        ...validEnv,
+        NODE_ENV: "production",
+        RESEND_API_KEY: "re_test",
+      };
+
+      expect(validateEnvironment(env).expertChat).toEqual({ provider: "unavailable" });
+    });
+
+    it("reads OPENAI_API_KEY and OPENAI_CHAT_MODEL outside tests", () => {
+      const env = { ...validEnv, NODE_ENV: "production", RESEND_API_KEY: "re_test" };
+
+      expect(validateEnvironment({ ...env, OPENAI_API_KEY: "sk-x" }).expertChat).toEqual({
+        provider: "openai",
+        apiKey: "sk-x",
+        model: "gpt-4o-mini",
+      });
+      expect(
+        validateEnvironment({ ...env, OPENAI_API_KEY: "sk-x", OPENAI_CHAT_MODEL: "gpt-4o" })
+          .expertChat,
+      ).toMatchObject({ model: "gpt-4o" });
+    });
+  });
+
   it("exposes the database URL without changing it", () => {
     expect(validateEnvironment(validEnv).databaseUrl).toBe(validEnv.DATABASE_URL);
   });
@@ -180,5 +212,25 @@ describe("validateEnvironment", () => {
     expect(() => validateEnvironment({ ...validEnv, AUTH_JWT_SECRET: short })).not.toThrowError(
       new RegExp(short),
     );
+  });
+});
+
+describe("loadEnvironment", () => {
+  it("keeps the raw variables next to the typed settings (the knowledge and media modules read them by name)", () => {
+    const loaded = loadEnvironment({
+      ...validEnv,
+      WEAVIATE_URL: "http://localhost:8080",
+      WEAVIATE_API_KEY: "weaviate-key",
+      GEMINI_API_KEY: "gemini-key",
+    });
+
+    expect(loaded.WEAVIATE_URL).toBe("http://localhost:8080");
+    expect(loaded.WEAVIATE_API_KEY).toBe("weaviate-key");
+    expect(loaded.GEMINI_API_KEY).toBe("gemini-key");
+    expect(loaded.apiPort).toBe(3002);
+  });
+
+  it("still rejects an invalid environment", () => {
+    expect(() => loadEnvironment({})).toThrow(/Missing required environment variables/);
   });
 });

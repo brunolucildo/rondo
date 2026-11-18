@@ -237,3 +237,73 @@ Os componentes de `@repo/ui/brand` são a fonte para as telas do app. O `apps/do
 ### 11.5 Fora do escopo desta versão
 
 O nome exibido nos e-mails, nos logs e na telemetria é "Rondo". Os e-mails ainda não usam a identidade visual das telas (regra de e-mail a definir).
+
+## 12. Personagens dos experts
+
+Cada expert tem um avatar pixel art 8-bit de um **personagem fictício** (spec `0021`; nomes definidos na `0019`). Os PNGs ficam em `apps/app/src/assets/experts/<id>.png`, são gerados **uma vez** e à mão por `bun run experts:avatars` (modelo `gpt-image-2`) e revisados por pessoa antes de entrar na `main`. Os prompts e as fichas vivem em `packages/experts-avatars/src/characters.ts`; esta tabela é a versão para leitura e deve ficar igual a ele.
+
+### 12.1 Fichas
+
+| `id`                  | Personagem                 | Aparência                                                        | Adereços                                                           | Cores dominantes                             |
+| --------------------- | -------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------ | -------------------------------------------- |
+| `head-coach`          | Arnaldo Pinheiro Lessa     | Técnico veterano, sessenta anos, cabelo e bigode grisalhos       | Jaqueta de treino, apito no pescoço, prancheta em branco           | `blaze-orange`, `ink`                        |
+| `performance-analyst` | Lívia Taborda Reis         | Mulher jovem, rabo de cavalo alto, óculos redondos               | Polo, headset no pescoço, tablet com gráfico de barras sem números | `lime-moss`, `golden-glow`, `ink`            |
+| `sports-lawyer`       | Heitor Camargo Valente     | Homem de quarenta anos, barba aparada, olhar sério               | Terno escuro e gravata, maleta fina, balança da justiça            | `ink`, `sunflower-gold`, `paper`             |
+| `physiologist`        | Marta Quintela Ribas       | Mulher de trinta anos, cabelo curto e cacheado                   | Jaqueta esportiva, cronômetro no pescoço, monitor de batimentos    | `forest-moss`, `golden-glow`, `ink`          |
+| `sports-physician`    | Caio Menezes Aranha        | Homem de cinquenta anos, barba curta, olhar tranquilizador       | Jaleco branco, estetoscópio, maleta médica verde lisa              | `paper`, `lime-moss`, `ink`                  |
+| `physiotherapist`     | Tainá Seabra Moura         | Mulher de trinta anos, trança longa, sorriso acolhedor           | Camisa de treino, faixa elástica nos ombros, rolo de espuma        | `sunflower-gold`, `blaze-orange`, `ink`      |
+| `football-manager`    | Rogério Albuquerque Dantas | Homem de quarenta anos, cabelo penteado para trás, ar organizado | Blazer, relógio de pulso, pasta em branco e celular                | `forest-moss`, `paper`, `golden-glow`, `ink` |
+
+### 12.2 Regras da arte
+
+- Pixel art de verdade: grade de 48 px ampliada 3x (arquivo de 144 px), no máximo 16 cores mais a transparência (limite da spec: 32 cores, 20 KB por arquivo, 150 KB no conjunto). A ferramenta normaliza a saída do modelo; o fundo ligado à borda vira transparente, para servir ao tema claro e ao escuro.
+- Nenhum texto, número, logotipo, escudo de clube, bandeira ou marca na imagem; nenhuma pessoa real. O prompt nunca traz o nome do personagem nem de alguém real (testado com uma lista de termos proibidos).
+- Mostre o avatar em 48 px ou múltiplos (`size-12`, `size-24`): outros tamanhos deixam alguns pixels mais largos que outros. Use `image-rendering: pixelated` e dimensões fixas; nunca `object-cover` nem suavização.
+- `alt=""` quando o nome do expert está escrito ao lado (todos os usos atuais); `alt` descritivo só se a imagem ficar sozinha. Se o arquivo faltar ou falhar, o `PixelAvatar` da `0019` assume.
+- O `<select>` nativo não mostra imagem nas opções: o avatar do expert escolhido aparece ao lado do campo.
+
+### 12.3 Checklist de aprovação (Produto/Design, um item por expert)
+
+- [ ] Parece pixel art 8-bit (grade visível, sem gradiente nem suavização) e combina com a identidade Matchday.
+- [ ] Coerente com os outros seis (traço, contorno, paleta) e com a ficha do personagem.
+- [ ] Sem texto, escudo, marca, bandeira ou semelhança com pessoa real.
+- [ ] Legível em 48 px e em 96 px, nos temas claro e escuro.
+- [ ] Peso do arquivo e contagem de cores dentro dos limites (os testes de `packages/experts-avatars` conferem).
+- [ ] Captura da home com os sete avatares nos dois temas anexada ao PR.
+
+**Estado:** ferramenta, mapa e fallback prontos; os sete PNGs **ainda não foram gerados** (falta `OPENAI_API_KEY` na execução da spec) nem aprovados.
+
+## 12. Personagens dos experts
+
+Cada expert tem um avatar pixel art 8-bit de um **personagem fictício** (spec `0021`; nomes definidos na `0019`). Os PNGs ficam em `apps/app/src/assets/experts/<id>.png`, são gerados **uma vez** e à mão por `bun run experts:avatars` (modelo `gpt-image-2`) e revisados por pessoa antes de entrar na `main`. Os prompts e as fichas vivem em `packages/experts-avatars/src/characters.ts`; esta tabela é a versão para leitura e deve ficar igual a ele.
+
+### 12.1 Fichas
+
+| `id`                  | Personagem                 | Aparência                                                        | Adereços                                                           | Cores dominantes                             |
+| --------------------- | -------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------ | -------------------------------------------- |
+| `head-coach`          | Arnaldo Pinheiro Lessa     | Técnico veterano, sessenta anos, cabelo e bigode grisalhos       | Jaqueta de treino, apito no pescoço, prancheta em branco           | `blaze-orange`, `ink`                        |
+| `performance-analyst` | Lívia Taborda Reis         | Mulher jovem, rabo de cavalo alto, óculos redondos               | Polo, headset no pescoço, tablet com gráfico de barras sem números | `lime-moss`, `golden-glow`, `ink`            |
+| `sports-lawyer`       | Heitor Camargo Valente     | Homem de quarenta anos, barba aparada, olhar sério               | Terno escuro e gravata, maleta fina, balança da justiça            | `ink`, `sunflower-gold`, `paper`             |
+| `physiologist`        | Marta Quintela Ribas       | Mulher de trinta anos, cabelo curto e cacheado                   | Jaqueta esportiva, cronômetro no pescoço, monitor de batimentos    | `forest-moss`, `golden-glow`, `ink`          |
+| `sports-physician`    | Caio Menezes Aranha        | Homem de cinquenta anos, barba curta, olhar tranquilizador       | Jaleco branco, estetoscópio, maleta médica verde lisa              | `paper`, `lime-moss`, `ink`                  |
+| `physiotherapist`     | Tainá Seabra Moura         | Mulher de trinta anos, trança longa, sorriso acolhedor           | Camisa de treino, faixa elástica nos ombros, rolo de espuma        | `sunflower-gold`, `blaze-orange`, `ink`      |
+| `football-manager`    | Rogério Albuquerque Dantas | Homem de quarenta anos, cabelo penteado para trás, ar organizado | Blazer, relógio de pulso, pasta em branco e celular                | `forest-moss`, `paper`, `golden-glow`, `ink` |
+
+### 12.2 Regras da arte
+
+- Pixel art de verdade: grade de 48 px ampliada 3x (arquivo de 144 px), no máximo 16 cores mais a transparência (limite da spec: 32 cores, 20 KB por arquivo, 150 KB no conjunto). A ferramenta normaliza a saída do modelo; o fundo ligado à borda vira transparente, para servir ao tema claro e ao escuro.
+- Nenhum texto, número, logotipo, escudo de clube, bandeira ou marca na imagem; nenhuma pessoa real. O prompt nunca traz o nome do personagem nem de alguém real (testado com uma lista de termos proibidos).
+- Mostre o avatar em 48 px ou múltiplos (`size-12`, `size-24`): outros tamanhos deixam alguns pixels mais largos que outros. Use `image-rendering: pixelated` e dimensões fixas; nunca `object-cover` nem suavização.
+- `alt=""` quando o nome do expert está escrito ao lado (todos os usos atuais); `alt` descritivo só se a imagem ficar sozinha. Se o arquivo faltar ou falhar, o `PixelAvatar` da `0019` assume.
+- O `<select>` nativo não mostra imagem nas opções: o avatar do expert escolhido aparece ao lado do campo.
+
+### 12.3 Checklist de aprovação (Produto/Design, um item por expert)
+
+- [ ] Parece pixel art 8-bit (grade visível, sem gradiente nem suavização) e combina com a identidade Matchday.
+- [ ] Coerente com os outros seis (traço, contorno, paleta) e com a ficha do personagem.
+- [ ] Sem texto, escudo, marca, bandeira ou semelhança com pessoa real.
+- [ ] Legível em 48 px e em 96 px, nos temas claro e escuro.
+- [ ] Peso do arquivo e contagem de cores dentro dos limites (os testes de `packages/experts-avatars` conferem).
+- [ ] Captura da home com os sete avatares nos dois temas anexada ao PR.
+
+**Estado:** ferramenta, mapa e fallback prontos; os sete PNGs **ainda não foram gerados** (falta `OPENAI_API_KEY` na execução da spec) nem aprovados.

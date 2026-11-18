@@ -13,6 +13,14 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
+    "@google/genai": "3.4.0",
+    "@langchain/classic": "1.0.61",
+    "@langchain/community": "1.1.29",
+    "@langchain/core": "1.4.1",
+    "@langchain/langgraph": "1.7.5",
+    "@langchain/openai": "1.8.4",
+    "@langchain/textsplitters": "1.0.2",
+    "@langchain/weaviate": "1.1.0",
     "@nestjs/common": "^12.4.0",
     "@nestjs/config": "^12.1.1",
     "@nestjs/core": "^12.4.0",
@@ -31,12 +39,15 @@
     "argon2": "^0.45.2",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",
+    "html-to-text": "9.0.5",
     "jose": "^6.2.17",
+    "pdf-parse": "2.4.5",
     "pg": "^8.23.1",
     "pino": "^10.4.0",
     "pino-http": "^11.0.0",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.2"
+    "rxjs": "^7.8.2",
+    "weaviate-client": "3.15.3"
   },
   "devDependencies": {
     "@nestjs/cli": "^12.0.12",
@@ -44,6 +55,7 @@
     "@opentelemetry/context-async-hooks": "3.1.0",
     "@opentelemetry/sdk-trace": "3.1.0",
     "@repo/typescript-config": "*",
+    "@types/html-to-text": "9.0.4",
     "@types/node": "^26.4.1",
     "@types/pg": "^8.23.1",
     "@types/supertest": "^7.2.1",

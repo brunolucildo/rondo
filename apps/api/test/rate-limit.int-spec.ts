@@ -73,6 +73,10 @@ describe("Rate limiting", () => {
       authJwtSecret: "test-only-jwt-secret-0123456789-abcdefghij",
       authHashConcurrency: 3,
       authHashQueueLimit: 64,
+      expertChat: { provider: "fake" },
+      // Read by the `knowledge` module (loaded by the app) through `ConfigService.get`.
+      WEAVIATE_URL: "http://localhost:8080",
+      WEAVIATE_API_KEY: "test-weaviate-key",
       trustProxy,
       email: { provider: "capture", from: { name: "Test", address: "no-reply@test.local" } },
     };

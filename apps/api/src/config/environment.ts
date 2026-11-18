@@ -1,4 +1,10 @@
 import { type EmailConfig, parseEmailConfig, resolveNodeEnv } from "../modules/email";
+import {
+  type ExpertChatConfig,
+  type ExpertRetrievalConfig,
+  parseExpertChatConfig,
+  parseExpertRetrievalConfig,
+} from "../modules/experts";
 import { MIN_JWT_SECRET_LENGTH } from "./auth-secret";
 import { parseDatabaseUrl } from "./database";
 
@@ -19,6 +25,10 @@ export interface Environment {
   authHashConcurrency: number;
   /** Password hashes allowed to wait for a free slot before the API answers 503. */
   authHashQueueLimit: number;
+  /** Chat model of the experts: OpenAI, the scripted fake (`NODE_ENV=test`) or none (no key). */
+  expertChat: ExpertChatConfig;
+  /** How many chunks a question retrieves and the similarity threshold (spec 0024). */
+  expertRetrieval: ExpertRetrievalConfig;
 }
 
 const REQUIRED_VARIABLES = ["DATABASE_URL", "APP_URL"] as const;
@@ -118,8 +128,10 @@ export function validateEnvironment(env: Record<string, string | undefined>): En
     throw new Error("API_PORT must be an integer between 1 and 65535.");
   }
 
+  const nodeEnv = resolveNodeEnv(env);
+
   return {
-    nodeEnv: resolveNodeEnv(env),
+    nodeEnv,
     databaseUrl: parseDatabaseUrl(env.DATABASE_URL),
     // Presence is checked above, so the value is a string here.
     appUrl: parseAppOrigin(env.APP_URL as string),
@@ -136,5 +148,17 @@ export function validateEnvironment(env: Record<string, string | undefined>): En
       DEFAULT_HASH_QUEUE_LIMIT,
       0,
     ),
+    expertChat: parseExpertChatConfig(env, nodeEnv),
+    expertRetrieval: parseExpertRetrievalConfig(env),
   };
+}
+
+/**
+ * What `ConfigModule` receives as `validate`. Nest exposes only the object the validator returns:
+ * without the raw variables, `ConfigService.get("WEAVIATE_URL")` (and `OPENAI_API_KEY` for
+ * embeddings and vision, `GEMINI_*`) is `undefined` whenever the value lives only in `.env`. So the
+ * typed settings are added on top of the raw variables, never instead of them.
+ */
+export function loadEnvironment(env: Record<string, string | undefined>): Record<string, unknown> {
+  return { ...env, ...validateEnvironment(env) };
 }

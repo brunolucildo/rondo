@@ -1,0 +1,150 @@
+import { Inject, Module, type OnModuleDestroy } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { Pool } from "pg";
+import { createPostgresPoolConfig } from "../../config/database";
+import type { Environment } from "../../config/environment";
+import { createDatabaseClient, type DatabaseClient } from "../../observability/db-telemetry";
+import {
+  CONNECTION_REPOSITORY,
+  type ConnectionRepository,
+  ConnectionsModule,
+} from "../connections";
+import {
+  EMBEDDINGS_GENERATOR,
+  type EmbeddingsGenerator,
+  KNOWLEDGE_INDEX,
+  type KnowledgeIndex,
+  KnowledgeModule,
+} from "../knowledge";
+import { ClearConversation } from "./application/use-cases/clear-conversation.use-case";
+import { GetConversation } from "./application/use-cases/get-conversation.use-case";
+import { ListExperts } from "./application/use-cases/list-experts.use-case";
+import { SendExpertMessage } from "./application/use-cases/send-expert-message.use-case";
+import type { ConversationLock, ConversationRepository } from "./domain/conversation-ports";
+import type { ExpertChatConfig } from "./domain/expert-chat-config";
+import type {
+  CitationSources,
+  ConnectionSources,
+  ExpertOrchestrator,
+  KnowledgeRetriever,
+} from "./domain/expert-ports";
+import type { ExpertRetrievalConfig } from "./domain/expert-retrieval-config";
+import {
+  CITATION_SOURCES,
+  CONNECTION_SOURCES,
+  CONVERSATION_DATABASE,
+  CONVERSATION_LOCK,
+  CONVERSATION_REPOSITORY,
+  EXPERT_CHAT_CONFIG,
+  EXPERT_ORCHESTRATOR,
+  EXPERT_RETRIEVAL_CONFIG,
+  KNOWLEDGE_RETRIEVER,
+} from "./experts.tokens";
+import { createExpertOrchestrator } from "./infrastructure/create-expert-orchestrator";
+import { InMemoryConversationLock } from "./infrastructure/in-memory-conversation-lock";
+import { KnowledgeIndexRetriever } from "./infrastructure/knowledge-index-retriever";
+import { PostgresConversationRepository } from "./infrastructure/postgres-conversation.repository";
+import { RepositoryCitationSources } from "./infrastructure/repository-citation-sources";
+import { RepositoryConnectionSources } from "./infrastructure/repository-connection-sources";
+import { ClearConversationRequestHandler } from "./interface/request-handlers/clear-conversation.request-handler";
+import { GetConversationRequestHandler } from "./interface/request-handlers/get-conversation.request-handler";
+import { ListExpertsRequestHandler } from "./interface/request-handlers/list-experts.request-handler";
+import { SendExpertMessageRequestHandler } from "./interface/request-handlers/send-expert-message.request-handler";
+
+@Module({
+  // The retrieval reads the `knowledge` ports; the attached files are checked against the
+  // connections of the user (both through their public surface).
+  imports: [KnowledgeModule, ConnectionsModule],
+  controllers: [
+    ListExpertsRequestHandler,
+    SendExpertMessageRequestHandler,
+    GetConversationRequestHandler,
+    ClearConversationRequestHandler,
+  ],
+  providers: [
+    {
+      provide: EXPERT_CHAT_CONFIG,
+      inject: [ConfigService],
+      useFactory: (config: ConfigService<Environment, true>): ExpertChatConfig =>
+        config.get("expertChat", { infer: true }),
+    },
+    {
+      provide: EXPERT_RETRIEVAL_CONFIG,
+      inject: [ConfigService],
+      useFactory: (config: ConfigService<Environment, true>): ExpertRetrievalConfig =>
+        config.get("expertRetrieval", { infer: true }),
+    },
+    {
+      provide: KNOWLEDGE_RETRIEVER,
+      inject: [EMBEDDINGS_GENERATOR, KNOWLEDGE_INDEX, EXPERT_RETRIEVAL_CONFIG],
+      useFactory: (
+        embeddings: EmbeddingsGenerator,
+        index: KnowledgeIndex,
+        config: ExpertRetrievalConfig,
+      ): KnowledgeRetriever => new KnowledgeIndexRetriever(embeddings, index, config),
+    },
+    {
+      provide: CONNECTION_SOURCES,
+      inject: [CONNECTION_REPOSITORY],
+      useFactory: (connections: ConnectionRepository): ConnectionSources =>
+        new RepositoryConnectionSources(connections),
+    },
+    {
+      provide: CITATION_SOURCES,
+      inject: [CONNECTION_REPOSITORY],
+      useFactory: (connections: ConnectionRepository): CitationSources =>
+        new RepositoryCitationSources(connections),
+    },
+    {
+      // The only place that picks the model: OpenAI, the scripted fake (NODE_ENV=test) or none.
+      provide: EXPERT_ORCHESTRATOR,
+      inject: [EXPERT_CHAT_CONFIG, KNOWLEDGE_RETRIEVER],
+      useFactory: createExpertOrchestrator,
+    },
+    {
+      // The conversations do DML and call `expert_append_message` as `rondo_app` (ADR 0015).
+      provide: CONVERSATION_DATABASE,
+      inject: [ConfigService],
+      useFactory: (config: ConfigService<Environment, true>) =>
+        createDatabaseClient(
+          new Pool(createPostgresPoolConfig(config.get("databaseUrl", { infer: true }))),
+        ),
+    },
+    {
+      provide: CONVERSATION_REPOSITORY,
+      inject: [CONVERSATION_DATABASE],
+      useFactory: (client: DatabaseClient) => new PostgresConversationRepository(client),
+    },
+    // In memory, so it only holds for one API instance (ADR 0005 and the conversation ADR).
+    { provide: CONVERSATION_LOCK, useFactory: () => new InMemoryConversationLock() },
+    { provide: ListExperts, useFactory: () => new ListExperts() },
+    {
+      provide: SendExpertMessage,
+      inject: [EXPERT_ORCHESTRATOR, CONVERSATION_REPOSITORY, CONVERSATION_LOCK, CONNECTION_SOURCES],
+      useFactory: (
+        orchestrator: ExpertOrchestrator,
+        conversations: ConversationRepository,
+        lock: ConversationLock,
+        sources: ConnectionSources,
+      ) => new SendExpertMessage(orchestrator, conversations, lock, undefined, sources),
+    },
+    {
+      provide: GetConversation,
+      inject: [CONVERSATION_REPOSITORY, CITATION_SOURCES],
+      useFactory: (conversations: ConversationRepository, sources: CitationSources) =>
+        new GetConversation(conversations, sources),
+    },
+    {
+      provide: ClearConversation,
+      inject: [CONVERSATION_REPOSITORY],
+      useFactory: (conversations: ConversationRepository) => new ClearConversation(conversations),
+    },
+  ],
+})
+export class ExpertsModule implements OnModuleDestroy {
+  constructor(@Inject(CONVERSATION_DATABASE) private readonly database: DatabaseClient) {}
+
+  async onModuleDestroy(): Promise<void> {
+    await this.database.end();
+  }
+}

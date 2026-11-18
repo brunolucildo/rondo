@@ -66,7 +66,7 @@ test.describe("confirm account", () => {
     await page.goto(link as string);
 
     await expect(page).toHaveURL(`${APP_URL}/app`);
-    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Welcome, Ana");
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Chat with the experts");
     expect(await storedToken(page)).toBeTruthy();
     // One POST, even though the dev build runs React StrictMode.
     expect(confirmRequests).toEqual(["POST"]);
@@ -87,7 +87,7 @@ test.describe("confirm account", () => {
     await page.goto(`/auth/confirm-account?token=${token}`);
 
     await expect(page).toHaveURL(`${APP_URL}/app`);
-    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Welcome, Ana");
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Chat with the experts");
   });
 
   test("shows the invalid-link page for a link without a token or with a made-up one", async ({
@@ -144,6 +144,6 @@ test.describe("resend confirmation", () => {
     // ...and the new one confirms the account.
     await page.goto(newLink as string);
     await expect(page).toHaveURL(`${APP_URL}/app`);
-    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Welcome, Ana");
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Chat with the experts");
   });
 });

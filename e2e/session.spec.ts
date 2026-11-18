@@ -68,7 +68,7 @@ test.describe("/app without a session", () => {
 });
 
 test.describe("/app with a session", () => {
-  test("shows the welcome page for the signed-in user and sends the bearer token", async ({
+  test("shows the chat home for the signed-in user and sends the bearer token", async ({
     page,
   }) => {
     const { token } = await seedSignedInUser("welcome", "Bianca", "Souza");
@@ -89,8 +89,8 @@ test.describe("/app with a session", () => {
 
     expect((await sessionRequest).headers().authorization).toBe(`Bearer ${token}`);
     await expect(page.locator("h1")).toHaveCount(1);
-    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Welcome, Bianca");
-    await expect(page.getByText("You are signed in.")).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Chat with the experts");
+    await expect(page.getByRole("combobox", { name: "Expert" })).toBeVisible();
     await expect(page.getByText("Hello World")).toHaveCount(0);
     await expect(page.locator("html")).toHaveAttribute("lang", "en-US");
     expect(consoleErrors).toEqual([]);
@@ -105,11 +105,11 @@ test.describe("/app with a session", () => {
     await page.goto("/");
 
     await expect(page).toHaveURL(/\/app$/);
-    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Welcome, Ana");
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Chat with the experts");
 
     await page.reload();
 
-    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Welcome, Ana");
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Chat with the experts");
   });
 
   test("announces the session check while it runs", async ({ page }) => {
@@ -123,7 +123,7 @@ test.describe("/app with a session", () => {
     await page.goto("/app");
 
     await expect(page.getByRole("status")).toHaveText("Verifying your session…");
-    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Welcome, Ana");
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Chat with the experts");
     await expect(page.getByRole("status")).toHaveCount(0);
   });
 
@@ -152,7 +152,7 @@ test.describe("/app with a session", () => {
 
     await page.getByRole("button", { name: "Try again" }).click();
 
-    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Welcome, Ana");
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Chat with the experts");
   });
 
   test("shows the not-found page for an unknown /app path", async ({ page }) => {
@@ -173,7 +173,7 @@ test.describe("/auth/* for a signed-in user", () => {
     await page.goto("/auth/sign-up");
 
     await expect(page).toHaveURL(/\/app$/);
-    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Welcome, Ana");
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Chat with the experts");
   });
 
   test("still shows /auth/sign-up when the stored token is invalid", async ({ page }) => {

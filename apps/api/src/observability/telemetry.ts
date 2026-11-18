@@ -8,6 +8,7 @@ import { BatchLogRecordProcessor } from "@opentelemetry/sdk-logs";
 import { PeriodicExportingMetricReader } from "@opentelemetry/sdk-metrics";
 import { NodeSDK } from "@opentelemetry/sdk-node";
 import { ATTR_SERVICE_NAME } from "@opentelemetry/semantic-conventions";
+import { isEgressRequest } from "./egress-requests";
 import { outgoingUrlAttributes, redactHttpRequestSpan } from "./span-redaction";
 
 const endpoint = (process.env.OTEL_EXPORTER_OTLP_ENDPOINT ?? "http://localhost:4318").replace(
@@ -17,7 +18,8 @@ const endpoint = (process.env.OTEL_EXPORTER_OTLP_ENDPOINT ?? "http://localhost:4
 
 const timeoutMillis = Number(process.env.OTEL_EXPORTER_OTLP_TIMEOUT ?? 3000);
 
-const sdk = new NodeSDK({
+// Exported so the integration test can start it against a Collector that is down.
+export const sdk = new NodeSDK({
   // Sem detectores de host/processo: evitam exportar nome da máquina e caminhos locais.
   resourceDetectors: [],
   resource: resourceFromAttributes({
@@ -52,7 +54,11 @@ const sdk = new NodeSDK({
   instrumentations: [
     getNodeAutoInstrumentations({
       // Query strings carry PostgREST filters (e-mail, session id) and client input; IPs identify people.
-      "@opentelemetry/instrumentation-http": { requestHook: redactHttpRequestSpan },
+      "@opentelemetry/instrumentation-http": {
+        requestHook: redactHttpRequestSpan,
+        // Requests to links users connect: no span and no metric (host, path and query are theirs).
+        ignoreOutgoingRequestHook: isEgressRequest,
+      },
       "@opentelemetry/instrumentation-undici": { startSpanHook: outgoingUrlAttributes },
     }),
   ],

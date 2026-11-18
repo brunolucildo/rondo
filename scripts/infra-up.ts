@@ -8,7 +8,7 @@ const target = parseDatabaseUrl(databaseUrlFromEnv());
 const endpoint = `${isLocalHost(target.host) ? "postgres" : target.host}:${target.port}`;
 
 const composeCode = await run(
-  "docker compose up (Postgres, Grafana, Loki, Tempo, Mimir, OTel Collector)",
+  "docker compose up (Postgres, Weaviate, Grafana, Loki, Tempo, Mimir, OTel Collector)",
   ["docker", "compose", "up", "-d", "--build", "--wait", "--wait-timeout", "300"],
   {
     POSTGRES_ENDPOINT: endpoint,
@@ -31,6 +31,7 @@ console.log(
     "",
     "Infra pronta:",
     `- Postgres:     postgres://${target.username}@localhost:${target.port}/${target.database}`,
+    "- Weaviate:     http://localhost:8080 (so com a chave WEAVIATE_API_KEY)",
     "- Grafana:      http://localhost:3000 (admin/admin)",
     "- OTLP HTTP:    http://localhost:4318",
     "",

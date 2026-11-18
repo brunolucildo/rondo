@@ -8,7 +8,7 @@ import { App } from "../../App";
 import { ACCESS_TOKEN_KEY } from "../../lib/access-token";
 import { createQueryClient } from "../../lib/query-client";
 import { createAppRouter, redirectToSignIn } from "../../router";
-import { jsonResponse, SESSION_USER } from "../../test/render-app";
+import { EXPERTS_FIXTURE, HOME_HEADING, jsonResponse, SESSION_USER } from "../../test/render-app";
 
 const fetchMock = vi.fn();
 const originalFetch = globalThis.fetch;
@@ -32,7 +32,9 @@ function stubApi(confirmResponse: () => Response | Promise<Response>) {
     Promise.resolve(
       url.endsWith("/auth/confirm-account")
         ? confirmResponse()
-        : jsonResponse(200, { user: SESSION_USER }),
+        : url.endsWith("/experts")
+          ? jsonResponse(200, { experts: EXPERTS_FIXTURE })
+          : jsonResponse(200, { user: SESSION_USER }),
     ),
   );
 }
@@ -79,13 +81,13 @@ describe("confirm account page", () => {
     finish(confirmed());
   });
 
-  it("posts the token once, stores the session token and lands on /app with the user's name", async () => {
+  it("posts the token once, stores the session token and lands on /app", async () => {
     stubApi(confirmed);
 
     const router = renderPage("/auth/confirm-account?token=abc-123_XYZ");
 
     await waitFor(() => expect(router.state.location.pathname).toBe("/app"));
-    expect(await screen.findByRole("heading", { level: 1, name: "Welcome, Ana" })).toBeVisible();
+    expect(await screen.findByRole("heading", { level: 1, name: HOME_HEADING })).toBeVisible();
     expect(window.localStorage.getItem(ACCESS_TOKEN_KEY)).toBe(ACCESS_TOKEN);
 
     const calls = confirmCalls();
@@ -105,7 +107,7 @@ describe("confirm account page", () => {
     const router = renderPage("/auth/confirm-account?token=abc", { strict: true });
 
     await waitFor(() => expect(router.state.location.pathname).toBe("/app"));
-    expect(await screen.findByRole("heading", { level: 1, name: "Welcome, Ana" })).toBeVisible();
+    expect(await screen.findByRole("heading", { level: 1, name: HOME_HEADING })).toBeVisible();
     expect(confirmCalls()).toHaveLength(1);
     expect(window.localStorage.getItem(ACCESS_TOKEN_KEY)).toBe(ACCESS_TOKEN);
   });
@@ -114,7 +116,7 @@ describe("confirm account page", () => {
     stubApi(confirmed);
     renderPage("/auth/confirm-account?token=abc");
 
-    await screen.findByRole("heading", { level: 1, name: "Welcome, Ana" });
+    await screen.findByRole("heading", { level: 1, name: HOME_HEADING });
 
     expect(confirmCalls().map(([, init]) => (init as RequestInit).method)).toEqual(["POST"]);
   });

@@ -19,6 +19,38 @@ services:
       retries: 12
       start_period: 10s
 
+  # Banco vetorial dos experts (spec 0022, ADR "Weaviate com multi-tenancy por usuario").
+  # Versao fixada; sem modulos vetorizadores (a API calcula os vetores); so API key, sem acesso
+  # anonimo; portas so em 127.0.0.1. A chave padrao e so de desenvolvimento local.
+  weaviate:
+    image: cr.weaviate.io/semitechnologies/weaviate:1.40.5
+    command: ["--host", "0.0.0.0", "--port", "8080", "--scheme", "http"]
+    ports:
+      - "127.0.0.1:8080:8080"
+      - "127.0.0.1:50051:50051"
+    environment:
+      CLUSTER_HOSTNAME: node1
+      PERSISTENCE_DATA_PATH: /var/lib/weaviate
+      DEFAULT_VECTORIZER_MODULE: none
+      ENABLE_MODULES: ""
+      API_BASED_MODULES_DISABLED: "true"
+      AUTOSCHEMA_ENABLED: "false"
+      QUERY_DEFAULTS_LIMIT: "25"
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: "false"
+      AUTHENTICATION_APIKEY_ENABLED: "true"
+      AUTHENTICATION_APIKEY_ALLOWED_KEYS: ${WEAVIATE_API_KEY:-rondo-dev-weaviate-key}
+      AUTHENTICATION_APIKEY_USERS: rondo-api
+      DISABLE_TELEMETRY: "true"
+    volumes:
+      - weaviate-data:/var/lib/weaviate
+    healthcheck:
+      test:
+        ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8080/v1/.well-known/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+
   grafana:
     image: grafana/grafana:latest
     ports:
@@ -140,3 +172,4 @@ volumes:
   loki-data:
   tempo-data:
   mimir-data:
+  weaviate-data:

@@ -1,0 +1,53 @@
+{
+  "avatars": {
+    "head-coach": {
+      "file": "head-coach.png",
+      "model": "gpt-image-2",
+      "size": "1024x1024",
+      "generatedAt": "2026-11-17T21:25:46.754Z",
+      "promptHash": "24c7b98e5fb2402249872a652499695a42d1a7b9ab50b38c86a37b26bf5dd35c"
+    },
+    "performance-analyst": {
+      "file": "performance-analyst.png",
+      "model": "gpt-image-2",
+      "size": "1024x1024",
+      "generatedAt": "2026-11-17T21:25:56.889Z",
+      "promptHash": "2eba73edaf88301d0d92d3f59eb1f6c75941ba4dc45e790094717b9d306bcb83"
+    },
+    "sports-lawyer": {
+      "file": "sports-lawyer.png",
+      "model": "gpt-image-2",
+      "size": "1024x1024",
+      "generatedAt": "2026-11-17T21:26:07.979Z",
+      "promptHash": "2ca491b9f1da764a714c2feb7f8f154e32d87f392aec441ffb1b66496b5b72cd"
+    },
+    "physiologist": {
+      "file": "physiologist.png",
+      "model": "gpt-image-2",
+      "size": "1024x1024",
+      "generatedAt": "2026-11-17T21:26:22.049Z",
+      "promptHash": "f05b162fa4dd9d35a0de32336ec29c58cbbe0d1762005ad7e99007457cc841ec"
+    },
+    "sports-physician": {
+      "file": "sports-physician.png",
+      "model": "gpt-image-2",
+      "size": "1024x1024",
+      "generatedAt": "2026-11-17T21:26:37.391Z",
+      "promptHash": "22262f25f4d2dc4b368903eb72eb985e36d2a059440ec5e53380ae4fa2ec2eef"
+    },
+    "physiotherapist": {
+      "file": "physiotherapist.png",
+      "model": "gpt-image-2",
+      "size": "1024x1024",
+      "generatedAt": "2026-11-17T21:26:54.623Z",
+      "promptHash": "b442eb635992879d40023ca2fbdeaeb6cea22498af3c4068adfd841d94494f79"
+    },
+    "football-manager": {
+      "file": "football-manager.png",
+      "model": "gpt-image-2",
+      "size": "1024x1024",
+      "generatedAt": "2026-11-17T21:27:05.551Z",
+      "promptHash": "fcb9c8ac447a90bb14bce5d57ba765221f239da206302d4bbc5ede65db8f4877"
+    }
+  }
+}

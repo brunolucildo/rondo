@@ -34,16 +34,24 @@ export interface ApiClientOptions {
   onUnauthenticated?: () => void;
 }
 
+export interface RequestOptions {
+  /** Aborting it cancels the request (it rejects with a `NETWORK_ERROR`, like any failed fetch). */
+  signal?: AbortSignal;
+}
+
 export interface ApiClient {
-  get<TResponse>(path: string): Promise<TResponse>;
+  get<TResponse>(path: string, options?: RequestOptions): Promise<TResponse>;
   post<TResponse>(path: string, body: unknown): Promise<TResponse>;
+  /** For `204 No Content` answers: resolves `undefined` on success. */
+  delete(path: string): Promise<void>;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
-function toApiError(status: number, payload: unknown): ApiError {
+/** Builds the typed error from an error response: the envelope when it is one, else a generic one. */
+export function toApiError(status: number, payload: unknown): ApiError {
   const envelope = isRecord(payload) && isRecord(payload.error) ? payload.error : undefined;
 
   if (
@@ -68,9 +76,10 @@ export function createApiClient({
   const root = baseUrl.replace(/\/+$/, "");
 
   async function request<TResponse>(
-    method: "GET" | "POST",
+    method: "GET" | "POST" | "DELETE",
     path: string,
     body?: unknown,
+    signal?: AbortSignal,
   ): Promise<TResponse> {
     // Resolved on each call so tests (and polyfills) can replace the global fetch.
     const send = fetcher ?? globalThis.fetch;
@@ -92,6 +101,7 @@ export function createApiClient({
         method,
         headers,
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+        ...(signal === undefined ? {} : { signal }),
       });
     } catch {
       throw new ApiError(0, "NETWORK_ERROR", "Could not reach the server.");
@@ -113,8 +123,9 @@ export function createApiClient({
   }
 
   return {
-    get: (path) => request("GET", path),
+    get: (path, options) => request("GET", path, undefined, options?.signal),
     post: (path, body) => request("POST", path, body),
+    delete: (path) => request<void>("DELETE", path),
   };
 }
 
