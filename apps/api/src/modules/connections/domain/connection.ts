@@ -1,5 +1,8 @@
-/** Kinds of connection this slice can ingest. Audio and video go through the media understanding port. */
-export const CONNECTION_KINDS = ["pdf", "txt", "md", "audio", "video"] as const;
+/**
+ * Kinds of connection this slice can ingest. Images go through the vision port (spec 0026), audio
+ * and video through the media understanding port (spec 0028). URLs come later.
+ */
+export const CONNECTION_KINDS = ["pdf", "txt", "md", "image", "audio", "video"] as const;
 
 export type ConnectionKind = (typeof CONNECTION_KINDS)[number];
 

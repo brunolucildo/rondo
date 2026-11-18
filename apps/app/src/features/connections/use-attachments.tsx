@@ -278,7 +278,7 @@ export function AttachmentsProvider({ children }: { children: ReactNode }) {
         queryClient.setQueryData(["connections", connection.id], connection);
         dispatch({ type: "sent", id, connectionId: connection.id });
       } catch (error) {
-        dispatch({ type: "rejected", id, rejection: describeUploadFailure(error) });
+        dispatch({ type: "rejected", id, rejection: describeUploadFailure(error, file.name) });
       }
     },
     [mutateAsync, queryClient],

@@ -3,7 +3,7 @@
 > Spec executável. Preencha todas as seções; `TODO` é lacuna, não requisito.
 > Use `create-spec` para criar, `refine-spec` para auditar e `implement-me` para executar.
 
-- **Status:** pronta
+- **Status:** concluída
 - **Slug:** 0026-connections-images
 - **Data:** 2026-11-17
 - **Atualizado em:** 2026-11-17
@@ -69,15 +69,15 @@
 
 ## 6. Acceptance Criteria
 
-- [ ] Given um `.gif` renomeado para `.png`, Then `400 UNSUPPORTED_FILE`; given 11 MB, `413`; given 9.000 px, `400 IMAGE_TOO_LARGE`.
-- [ ] Given a mesma imagem duas vezes, Then o segundo envio é dedup e não chama a visão, os embeddings nem o índice.
-- [ ] Given uma imagem válida, Then os chunks da descrição e do texto estão no índice do usuário e a imagem não fica em disco.
-- [ ] Given imagem em branco, Then `failed` com `NO_EXTRACTABLE_TEXT`; given recusa, `CONTENT_NOT_PROCESSABLE`; given 429 repetido, `PROCESSING_UNAVAILABLE`.
-- [ ] Given a imagem anexada e uma pergunta sobre ela, Then a resposta cita a imagem com `page: null`.
-- [ ] Given a exclusão, Then a imagem some da busca e a citação vira "Source removed".
-- [ ] Given texto malicioso na imagem, Then ele vai no bloco delimitado e a persona continua valendo.
-- [ ] Given o sentinela, Then nenhum log, span ou métrica o contém; a instrução de visão proíbe identificar pessoas.
-- [ ] Given `bun run lint`, `check-types`, `test`, `test:integration` e `test:e2e`, Then passam sem chamar a OpenAI.
+- [x] Given um `.gif` renomeado para `.png`, Then `400 UNSUPPORTED_FILE`; given 11 MB, `413`; given 9.000 px, `400 IMAGE_TOO_LARGE`.
+- [x] Given a mesma imagem duas vezes, Then o segundo envio é dedup e não chama a visão, os embeddings nem o índice.
+- [x] Given uma imagem válida, Then os chunks da descrição e do texto estão no índice do usuário e a imagem não fica em disco.
+- [x] Given imagem em branco, Then `failed` com `NO_EXTRACTABLE_TEXT`; given recusa, `CONTENT_NOT_PROCESSABLE`; given 429 repetido, `PROCESSING_UNAVAILABLE`.
+- [x] Given a imagem anexada e uma pergunta sobre ela, Then a resposta cita a imagem com `page: null`.
+- [x] Given a exclusão, Then a imagem some da busca e a citação vira "Source removed".
+- [x] Given texto malicioso na imagem, Then ele vai no bloco delimitado e a persona continua valendo.
+- [x] Given o sentinela, Then nenhum log, span ou métrica o contém; a instrução de visão proíbe identificar pessoas.
+- [x] Given `bun run lint`, `check-types`, `test`, `test:integration` e `test:e2e`, Then passam sem chamar a OpenAI.
 
 ## 7. O que fazer
 
@@ -127,6 +127,10 @@ Como validar que a spec foi atendida:
 | **Premissa:** o modelo de visão é o `gpt-4o-mini` (já em uso), sem OCR dedicado.                                           | Qualidade da transcrição em fotos ruins.         | Não         | Eng.             |
 | Pergunta: o Produto precisa de OCR dedicado para súmulas manuscritas ou fotos de baixa qualidade?                          | Nova integração e custo.                         | Não         | Produto          |
 | **Premissa:** o E2E usa a visão falsa (`NODE_ENV=test`, como na 0019); o limite de envios é o da 0023 (por IP, política `connection-upload`). | Como testar o fluxo sem OpenAI. | Não | Eng. |
+| **Premissa (plano 0026):** sem redimensionamento antes do envio (evita dependência nativa); `detail: "auto"`, 10 MB e 8.000 px contêm o custo; reavaliar com a telemetria. | Custo de tokens de visão. | Não | Eng. |
+| **Premissa (plano 0026):** os bytes decidem o formato (JPEG ou PNG pela assinatura, dimensões pelo cabeçalho, sem biblioteca); um JPEG com extensão `.png` é aceito e enviado como JPEG. Cabeçalho ilegível é `UNSUPPORTED_FILE`. | Validação de upload. | Não | Eng. |
+| **Premissa (plano 0026):** sem `OPENAI_API_KEY` a imagem falha com `PROCESSING_UNAVAILABLE` (como os embeddings); `OPENAI_VISION_MODEL` opcional (padrão `gpt-4o-mini`). Recusa do provedor (`refusal`, `content_filter`, 400 ou 422) é `CONTENT_NOT_PROCESSABLE`. | Configuração e mapeamento de erros; o formato real dos erros da OpenAI não foi exercitado. | Não | Eng. |
+| **Pendência:** avaliação com o modelo real (qualidade da transcrição, injeção, recusa de rosto) fica para uma execução com `OPENAI_API_KEY` (roteiro em `QA.md` §1.23). | Nenhum teste automatizado chama a OpenAI. | Não | Produto/Eng. |
 
 ## 12. Refinamento
 
@@ -134,3 +138,4 @@ Como validar que a spec foi atendida:
 | ---------- | ---------------------- | ------------------------------------------------------- |
 | 2026-11-17 | Spec criada (rascunho) | Fase 2 do épico de experts (`breakdown-specs`).         |
 | 2026-11-17 | Premissa de E2E e de limite de envios por IP registrada | Auditoria: o E2E sobe a API real e precisa de adaptador falso por `NODE_ENV=test`; nenhum requisito alterado |
+| 2026-11-17 | Implementada (status `concluída`) | `implement-me` na execução orquestrada: premissas de redimensionamento, formato pelos bytes, chave ausente e avaliação com o modelo real registradas em §11; nenhum requisito alterado |

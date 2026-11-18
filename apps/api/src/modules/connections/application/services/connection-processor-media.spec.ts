@@ -57,6 +57,7 @@ function setup(
       pdf: documents,
       txt: documents,
       md: documents,
+      image: documents,
       audio: new MediaDocumentExtractor("audio", media),
       video: new MediaDocumentExtractor("video", media),
     },

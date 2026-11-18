@@ -105,4 +105,26 @@ describe("connections module boundaries", () => {
 
     expect(offenders).toEqual([]);
   });
+
+  it("selects the scripted vision model only for NODE_ENV=test, never anything else (spec 0026)", () => {
+    const configSource = readFileSync(
+      join(CONNECTIONS_MODULE, "domain", "vision-config.ts"),
+      "utf8",
+    );
+    const fakeSelections = configSource.match(/provider: "fake"/g) ?? [];
+
+    expect(fakeSelections).toHaveLength(2); // the type and the single `test` branch
+    expect(configSource).toMatch(/nodeEnv === "test"/);
+  });
+
+  it("never reads or logs the bytes or the text of an image in the vision wrappers (spec 0026, R7)", () => {
+    const offenders = ["instrumented-image-describer.ts", "image-document-extractor.ts"].filter(
+      (name) =>
+        /logger|console\.|baseLogger/.test(
+          readFileSync(join(CONNECTIONS_MODULE, "infrastructure", name), "utf8"),
+        ),
+    );
+
+    expect(offenders).toEqual([]);
+  });
 });

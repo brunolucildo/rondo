@@ -5,7 +5,9 @@ import {
   type MediaUnderstandingFailure,
   type MediaUnderstandingRequest,
 } from "../domain/media-understanding";
+import { recordDependencyCall } from "../../../observability/agent-telemetry";
 import { recordMediaCleanup } from "../../../observability/connection-telemetry";
+import type { KnowledgeFailureReason } from "../../../observability/knowledge-telemetry";
 
 /**
  * Model of the Gemini family that understands audio and video (`generateContent`, not the
@@ -108,6 +110,50 @@ function classify(error: unknown): Classification {
   return { code: "UNAVAILABLE", retryable: false };
 }
 
+/**
+ * The closed `reason` of a failed call to Gemini for the `expert.dependency.calls` series (spec
+ * 0029): from the HTTP status or the kind of failure, never from the provider's message.
+ */
+function reasonOf(error: unknown): KnowledgeFailureReason {
+  if (error instanceof AttemptTimeoutError) {
+    return "timeout";
+  }
+
+  if (error instanceof MediaUnderstandingError) {
+    return error.code === "UNAVAILABLE" ? "provider_error" : "rejected";
+  }
+
+  const status = statusOf(error);
+
+  if (status === undefined) {
+    return "connection";
+  }
+
+  if (status === 429) {
+    return "rate_limited";
+  }
+
+  if (status >= 500) {
+    return "server_error";
+  }
+
+  return status === 401 || status === 403 ? "unauthorized" : "rejected";
+}
+
+/** One attempt as a call to the `gemini` dependency; an answer with no content is still an answer. */
+function recordAttempt(startedAt: number, error?: unknown): void {
+  const seconds = (performance.now() - startedAt) / 1000;
+
+  if (
+    error === undefined ||
+    (error instanceof MediaUnderstandingError && error.code === "NO_CONTENT")
+  ) {
+    recordDependencyCall("gemini", "success", "none", seconds);
+  } else {
+    recordDependencyCall("gemini", "failure", reasonOf(error), seconds);
+  }
+}
+
 function raceAbort<T>(work: Promise<T>, signal: AbortSignal): Promise<T> {
   if (signal.aborted) {
     return Promise.reject(new AttemptTimeoutError());
@@ -189,6 +235,7 @@ export class GeminiMediaUnderstanding implements MediaUnderstanding {
       for (let attempt = 1; ; attempt += 1) {
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), this.attemptTimeoutMs);
+        const startedAt = performance.now();
 
         try {
           uploaded ??= await raceAbort(
@@ -198,13 +245,19 @@ export class GeminiMediaUnderstanding implements MediaUnderstanding {
 
           const ready = await this.untilActive(client, uploaded, controller.signal);
 
-          return this.readAnswer(
+          const answer = this.readAnswer(
             await raceAbort(
               client.generate(ready, request.instruction, controller.signal),
               controller.signal,
             ),
           );
+
+          recordAttempt(startedAt);
+
+          return answer;
         } catch (error) {
+          recordAttempt(startedAt, error);
+
           const { code, retryable } = classify(error);
 
           if (!retryable || attempt >= this.maxAttempts) {

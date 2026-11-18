@@ -194,7 +194,8 @@ export function ConnectionsPanel({ onClose }: ConnectionsPanelProps) {
             Add
           </h3>
           <p className="text-sm text-muted-foreground">
-            PDF, TXT or Markdown, up to 20 MB. Your experts will answer from what you connect.
+            PDF, TXT, Markdown, JPG or PNG, up to 20 MB (images up to 10 MB). Your experts will
+            answer from what you connect.
           </p>
           <input
             ref={inputRef}

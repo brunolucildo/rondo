@@ -44,7 +44,7 @@ const UNSUPPORTED_FILE = () =>
   new ApiException(
     HttpStatus.BAD_REQUEST,
     "UNSUPPORTED_FILE",
-    "Only PDF, TXT, Markdown, MP3 and MP4 files are supported.",
+    "Only PDF, TXT, Markdown, JPG, PNG, MP3 and MP4 files are supported.",
   );
 
 const UPLOAD_OPTIONS: MulterOptions = {
@@ -69,9 +69,15 @@ function invalidUploadException(code: InvalidUploadError["code"], fileName: stri
       return new ApiException(
         HttpStatus.PAYLOAD_TOO_LARGE,
         "FILE_TOO_LARGE",
-        `The file is larger than ${megabytes} MB.`,
+        `The ${kind === "image" ? "image" : "file"} is larger than ${megabytes} MB.`,
       );
     }
+    case "IMAGE_TOO_LARGE":
+      return new ApiException(
+        HttpStatus.BAD_REQUEST,
+        "IMAGE_TOO_LARGE",
+        "The image is larger than 8,000 pixels on a side.",
+      );
     case "EMPTY_FILE":
       return new ApiException(HttpStatus.BAD_REQUEST, "EMPTY_FILE", "The file is empty.");
     case "MEDIA_TOO_LONG":

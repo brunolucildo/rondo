@@ -91,7 +91,7 @@ afterEach(() => {
 });
 
 describe("the Add connection button (R1)", () => {
-  it("is a button reachable by keyboard that opens the file picker for PDF, TXT and Markdown", async () => {
+  it("is a button reachable by keyboard that opens the file picker for PDF, TXT, Markdown, JPG, PNG, MP3 and MP4", async () => {
     stubApi(() => jsonResponse(500, {}));
 
     const user = userEvent.setup();
@@ -100,7 +100,7 @@ describe("the Add connection button (R1)", () => {
 
     const button = screen.getByRole("button", { name: "Add connection" });
 
-    expect(fileInput()).toHaveAttribute("accept", ".pdf,.txt,.md,.mp3,.mp4");
+    expect(fileInput()).toHaveAttribute("accept", ".pdf,.txt,.md,.jpg,.jpeg,.png,.mp3,.mp4");
 
     const clicked = vi.spyOn(fileInput(), "click");
 
@@ -269,7 +269,9 @@ describe("failures (R8)", () => {
     await user.upload(fileInput(), pdf("fake.pdf"));
 
     expect(
-      await screen.findByText("Only PDF, TXT, Markdown, MP3 and MP4 files are supported."),
+      await screen.findByText(
+        "Only PDF, TXT, Markdown, JPG, PNG, MP3 and MP4 files are supported.",
+      ),
     ).toBeInTheDocument();
   });
 
@@ -350,5 +352,135 @@ describe("the privacy notice (R9)", () => {
 
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     await waitFor(() => expect(calls.filter(isUpload)).toHaveLength(2));
+  });
+});
+
+describe("images (spec 0026)", () => {
+  const image = (name = "escalacao.png", type = "image/png") =>
+    new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], name, { type });
+  const imageConnection = (overrides: Partial<ConnectionDto> = {}) =>
+    connection({ name: "escalacao.png", kind: "image", ...overrides });
+
+  it("accepts a PNG and a JPG as a chip with the processing state, then ready", async () => {
+    const calls = stubApi((call) =>
+      isUpload(call)
+        ? jsonResponse(202, { ...imageConnection(), deduplicated: false })
+        : jsonResponse(200, imageConnection({ status: "ready", chunkCount: 2 })),
+    );
+    const user = userEvent.setup();
+
+    await openHome();
+    await user.upload(fileInput(), image());
+    await user.upload(fileInput(), image("foto.jpg", "image/jpeg"));
+
+    expect(await screen.findByText("escalacao.png")).toBeInTheDocument();
+    await waitFor(() => expect(calls.filter(isUpload)).toHaveLength(2));
+    expect(await screen.findAllByText("Ready", {}, { timeout: 4000 })).not.toHaveLength(0);
+  });
+
+  it("does not upload an image above 10 MB, with the message of images", async () => {
+    const calls = stubApi(() => jsonResponse(500, {}));
+    const user = userEvent.setup();
+    const big = image("big.png");
+
+    Object.defineProperty(big, "size", { value: 11 * 1024 * 1024 });
+    await openHome();
+    await user.upload(fileInput(), big);
+
+    expect(await screen.findByText("Images can have at most 10 MB.")).toBeInTheDocument();
+    expect(calls.filter(isUpload)).toHaveLength(0);
+  });
+
+  it("explains an image the API refused for its dimensions or size, by its code", async () => {
+    stubApi((call) =>
+      isUpload(call)
+        ? jsonResponse(400, { error: { code: "IMAGE_TOO_LARGE", message: "x", details: [] } })
+        : jsonResponse(500, {}),
+    );
+
+    const user = userEvent.setup();
+
+    await openHome();
+    await user.upload(fileInput(), image("huge.png"));
+
+    expect(
+      await screen.findByText("Images can have at most 8,000 pixels on each side."),
+    ).toBeInTheDocument();
+  });
+
+  it("explains an image without content, with advice and no Try again", async () => {
+    stubApi((call) =>
+      isUpload(call)
+        ? jsonResponse(202, { ...imageConnection(), deduplicated: false })
+        : jsonResponse(
+            200,
+            imageConnection({ status: "failed", errorCode: "NO_EXTRACTABLE_TEXT" }),
+          ),
+    );
+
+    const user = userEvent.setup();
+
+    await openHome();
+    await user.upload(fileInput(), image());
+
+    expect(
+      await screen.findByText(
+        "We couldn't find any text or relevant content in this image. Send a clearer, well-lit image.",
+        {},
+        { timeout: 4000 },
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Try again/ })).not.toBeInTheDocument();
+  });
+
+  it("explains a refusal of the provider and offers Try again when it was unavailable", async () => {
+    let code = "CONTENT_NOT_PROCESSABLE";
+
+    stubApi((call) =>
+      isUpload(call)
+        ? jsonResponse(202, { ...imageConnection(), deduplicated: false })
+        : jsonResponse(200, imageConnection({ status: "failed", errorCode: code })),
+    );
+
+    const user = userEvent.setup();
+
+    await openHome();
+    await user.upload(fileInput(), image());
+
+    expect(
+      await screen.findByText(
+        "The AI provider couldn't process this image. Try another image.",
+        {},
+        { timeout: 4000 },
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Try again/ })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Remove escalacao.png" }));
+    code = "PROCESSING_UNAVAILABLE";
+    await user.upload(fileInput(), image("another.png"));
+
+    expect(
+      await screen.findByText(
+        "We couldn't process this image right now. Try again in a moment.",
+        {},
+        { timeout: 4000 },
+      ),
+    ).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /^Try again/ })).toBeInTheDocument();
+  });
+
+  it("tells in the privacy notice that images are sent to the AI provider too", async () => {
+    window.localStorage.removeItem(PRIVACY_KEY);
+    stubApi(() => jsonResponse(500, {}));
+
+    const user = userEvent.setup();
+
+    await openHome();
+    await user.upload(fileInput(), image());
+
+    const dialog = await screen.findByRole("dialog", { name: "Before you connect a file" });
+
+    expect(dialog).toHaveAccessibleDescription(/Images are sent to the AI provider too/);
   });
 });

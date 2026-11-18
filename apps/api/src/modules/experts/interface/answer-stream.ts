@@ -1,5 +1,8 @@
 import type { ExpertAnswerEvent } from "../domain/expert-ports";
-import type { ExpertMessageResult } from "../../../observability/expert-telemetry";
+import type {
+  ExpertMessageProbe,
+  ExpertMessageResult,
+} from "../../../observability/expert-telemetry";
 
 /** The slice of the HTTP response the stream needs; keeps this file free of Express types. */
 export interface StreamResponse {
@@ -23,11 +26,13 @@ function frame(event: string, data: unknown): string {
  * (`{ citations }`, only when the retrieval ran; an empty list means no source covers the
  * question) and `done`, or `error` (`{ code, message }`) when the model failed
  * (`EXPERT_ANSWER_FAILED`) or the sources could not be searched (`KNOWLEDGE_UNAVAILABLE`). A client that left (Stop, closed tab)
- * gets nothing more. Returns what happened, for the telemetry; the text itself is never kept.
+ * gets nothing more. Returns what happened, for the telemetry; the text itself is never kept. The
+ * optional `probe` is told when the first token is written (spec 0029).
  */
 export async function writeAnswerStream(
   response: StreamResponse,
   events: AsyncIterable<ExpertAnswerEvent>,
+  probe?: ExpertMessageProbe,
 ): Promise<ExpertMessageResult> {
   response.statusCode = 200;
   response.setHeader("Content-Type", "text/event-stream; charset=utf-8");
@@ -48,6 +53,7 @@ export async function writeAnswerStream(
     switch (event.type) {
       case "text":
         response.write(frame("delta", { text: event.text }));
+        probe?.firstToken();
         break;
       case "citations":
         response.write(frame("citations", { citations: event.citations }));

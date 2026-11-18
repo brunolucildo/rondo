@@ -4,6 +4,7 @@ export type InvalidUploadCode =
   | "UNSUPPORTED_FILE"
   | "EMPTY_FILE"
   | "FILE_TOO_LARGE"
+  | "IMAGE_TOO_LARGE"
   /** An audio or video whose length the metadata cannot tell (spec 0028). */
   | "MEDIA_UNREADABLE"
   | "MEDIA_TOO_LONG";
@@ -75,5 +76,21 @@ export class MediaUnavailableError extends Error {
   constructor() {
     super("Media processing is unavailable.");
     this.name = "MediaUnavailableError";
+  }
+}
+
+/** The vision model could not be reached in time (timeout, 429, 5xx, no key): trying again may work. */
+export class VisionUnavailableError extends Error {
+  constructor() {
+    super("The vision model is unavailable.");
+    this.name = "VisionUnavailableError";
+  }
+}
+
+/** The provider refused to describe the image (content policy, unreadable image): retrying is useless. */
+export class VisionRefusedError extends Error {
+  constructor() {
+    super("The vision model refused the image.");
+    this.name = "VisionRefusedError";
   }
 }

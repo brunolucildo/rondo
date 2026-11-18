@@ -3,13 +3,33 @@ import { ApiError } from "../../lib/api-client";
 /** Largest document the API accepts. Checked here too so a big file is not uploaded for nothing. */
 export const MAX_FILE_BYTES = 20 * 1024 * 1024;
 
+/** Largest image the API accepts (10 MB); the 8,000 px limit per side is checked by the API. */
+export const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+
 /** Largest audio and video (spec 0028): MP3 50 MB, MP4 200 MB. */
 export const MAX_AUDIO_BYTES = 50 * 1024 * 1024;
 export const MAX_VIDEO_BYTES = 200 * 1024 * 1024;
 
-export const ACCEPTED_EXTENSIONS = [".pdf", ".txt", ".md", ".mp3", ".mp4"] as const;
+export const ACCEPTED_EXTENSIONS = [
+  ".pdf",
+  ".txt",
+  ".md",
+  ".jpg",
+  ".jpeg",
+  ".png",
+  ".mp3",
+  ".mp4",
+] as const;
 
-const SUPPORTED_TYPES_TEXT = "Only PDF, TXT, Markdown, MP3 and MP4 files are supported.";
+const IMAGE_EXTENSIONS = [".jpg", ".jpeg", ".png"] as const;
+
+const isImageName = (fileName: string): boolean => {
+  const name = fileName.toLowerCase();
+
+  return IMAGE_EXTENSIONS.some((extension) => name.endsWith(extension));
+};
+
+const UNSUPPORTED_TEXT = "Only PDF, TXT, Markdown, JPG, PNG, MP3 and MP4 files are supported.";
 
 export type MediaKind = "audio" | "video";
 
@@ -28,7 +48,7 @@ export type ConnectionStatus = "processing" | "ready" | "failed";
 export interface ConnectionDto {
   id: string;
   name: string;
-  kind: "pdf" | "txt" | "md" | "audio" | "video";
+  kind: "pdf" | "txt" | "md" | "image" | "audio" | "video";
   sizeBytes: number;
   /** Seconds of an audio or video; `null` for the other kinds. */
   durationSeconds?: number | null;
@@ -78,37 +98,65 @@ const NO_TEXT_IN_MEDIA: FailureMessage = {
   retryable: false,
 };
 
+/** What an image says differently from a document when it fails (the code is the same set). */
+const BY_IMAGE_PROCESSING_CODE: Record<string, FailureMessage> = {
+  NO_EXTRACTABLE_TEXT: {
+    text: "We couldn't find any text or relevant content in this image. Send a clearer, well-lit image.",
+    retryable: false,
+  },
+  CONTENT_NOT_PROCESSABLE: {
+    text: "The AI provider couldn't process this image. Try another image.",
+    retryable: false,
+  },
+  PROCESSING_UNAVAILABLE: {
+    text: "We couldn't process this image right now. Try again in a moment.",
+    retryable: true,
+  },
+};
+
 const GENERIC: FailureMessage = {
   text: "We couldn't connect this file. Try again in a moment.",
   retryable: true,
 };
 
-/** The fixed message of a `failed` connection, by the code the API gives. */
+/** The fixed message of a `failed` connection, by the code the API gives (and its kind). */
 export function describeProcessingFailure(
   errorCode: string | null,
   kind?: ConnectionDto["kind"],
 ): FailureMessage {
+  if (errorCode === null) {
+    return GENERIC;
+  }
+
   if (errorCode === "NO_EXTRACTABLE_TEXT" && (kind === "audio" || kind === "video")) {
     return NO_TEXT_IN_MEDIA;
   }
 
-  return (errorCode === null ? undefined : BY_PROCESSING_CODE[errorCode]) ?? GENERIC;
+  return (
+    (kind === "image" ? BY_IMAGE_PROCESSING_CODE[errorCode] : undefined) ??
+    BY_PROCESSING_CODE[errorCode] ??
+    GENERIC
+  );
 }
 
 /** The message of a refused upload (a 4xx or a network failure of `POST /connections`). */
-export function describeUploadFailure(error: unknown): FailureMessage {
+export function describeUploadFailure(error: unknown, fileName = ""): FailureMessage {
   if (!(error instanceof ApiError)) {
     return GENERIC;
   }
 
   switch (error.code) {
     case "UNSUPPORTED_FILE":
-      return { text: SUPPORTED_TYPES_TEXT, retryable: false };
+      return { text: UNSUPPORTED_TEXT, retryable: false };
     case "FILE_TOO_LARGE":
       return {
-        text: "This file is too large. Documents can have at most 20 MB, MP3 50 MB and MP4 200 MB.",
+        text: isImageName(fileName)
+          ? "Images can have at most 10 MB."
+          : "This file is too large. Documents can have at most 20 MB, MP3 50 MB and MP4 200 MB.",
         retryable: false,
       };
+    case "IMAGE_TOO_LARGE":
+      return { text: "Images can have at most 8,000 pixels on each side.", retryable: false };
     case "MEDIA_TOO_LONG":
       return {
         text: "Audio can have at most 60 minutes and video at most 20 minutes.",
@@ -152,7 +200,7 @@ export function checkFileBeforeUpload(file: File): FailureMessage | null {
   const name = file.name.toLowerCase();
 
   if (!ACCEPTED_EXTENSIONS.some((extension) => name.endsWith(extension))) {
-    return { text: SUPPORTED_TYPES_TEXT, retryable: false };
+    return { text: UNSUPPORTED_TEXT, retryable: false };
   }
 
   if (file.size === 0) {
@@ -167,6 +215,10 @@ export function checkFileBeforeUpload(file: File): FailureMessage | null {
 
   if (media === "video" && file.size > MAX_VIDEO_BYTES) {
     return { text: "MP4 files can have at most 200 MB.", retryable: false };
+  }
+
+  if (isImageName(name) && file.size > MAX_IMAGE_BYTES) {
+    return { text: "Images can have at most 10 MB.", retryable: false };
   }
 
   if (media === null && file.size > MAX_FILE_BYTES) {
@@ -209,6 +261,7 @@ const KIND_LABEL: Record<ConnectionDto["kind"], string> = {
   pdf: "PDF",
   txt: "TXT",
   md: "Markdown",
+  image: "Image",
   audio: "Audio",
   video: "Video",
 };

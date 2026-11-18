@@ -15,7 +15,7 @@ const METER_NAME = "rondo-api";
 /** Processing a minute of media takes seconds to a few minutes: the default buckets stop at 10 s. */
 const MEDIA_PER_MINUTE_BUCKETS_SECONDS = [0.5, 1, 2, 3, 5, 7.5, 10, 15, 20, 30, 60, 120];
 
-export type ConnectionIngestionKind = "pdf" | "txt" | "md" | "audio" | "video";
+export type ConnectionIngestionKind = "pdf" | "txt" | "md" | "image" | "audio" | "video";
 export type ConnectionIngestionOutcome = "success" | "failure";
 
 /** Closed set for the `reason` of a failed ingestion (the lower-case error codes). */
@@ -48,6 +48,11 @@ function createInstruments() {
     }),
     duration: meter.createHistogram("connection.ingestion.duration", {
       description: "Time to ingest a connection, from the start of processing to its final status.",
+      unit: "s",
+      advice: { explicitBucketBoundaries: DURATION_BUCKETS_SECONDS },
+    }),
+    vision: meter.createHistogram("connection.vision.duration", {
+      description: "Time of one call to the vision model (spec 0026), by outcome.",
       unit: "s",
       advice: { explicitBucketBoundaries: DURATION_BUCKETS_SECONDS },
     }),
@@ -84,6 +89,17 @@ function getInstruments() {
   instruments ??= createInstruments();
 
   return instruments;
+}
+
+export type VisionCallOutcome = "success" | "refused" | "unavailable";
+
+/** Duration of one call to the vision model (spec 0026): the outcome only, never the image or its text. Never throws. */
+export function recordVisionCall(outcome: VisionCallOutcome, durationSeconds: number): void {
+  try {
+    getInstruments().vision.record(durationSeconds, { outcome });
+  } catch {
+    // Telemetry must never change the answer.
+  }
 }
 
 export type ConnectionDeletionScope = "single" | "all";

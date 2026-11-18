@@ -1,6 +1,6 @@
-# XXXX — Gemini para o entendimento de áudio e vídeo
+# 0029 — Gemini para o entendimento de áudio e vídeo
 
-> Número provisório (`XXXX`): o orquestrador renumera ao integrar. Spec `0028`.
+> Decisão da spec `0028`. Numeração definida na integração (0027 é o ADR de imagens da spec `0026`; 0028, o de observabilidade).
 
 - **Status:** aceito
 - **Data:** 2026-11-18
@@ -11,7 +11,7 @@ A spec `0028` leva `.mp3` e `.mp4` ao índice dos experts. Áudio e vídeo preci
 
 ## Decisão
 
-Áudio e vídeo são lidos por um **modelo Gemini de entendimento multimodal da família Flash** (`GEMINI_UNDERSTANDING_MODEL`, padrão `gemini-3.6-flash`, lido da documentação em 2026-11-17), pela **Files API**: o servidor envia os bytes da memória, espera o arquivo ficar `ACTIVE`, pede a transcrição com marcas `[MM:SS]` (e `SCENE:` no vídeo) com uma instrução fixa que **proíbe identificar pessoas pelo rosto ou pela voz** e trata a mídia como dado, e **apaga o arquivo no provedor ao fim de qualquer desfecho**. O cliente fica atrás da porta `MediaUnderstanding` (domínio) com adaptador (`GeminiMediaUnderstanding`, SDK `@google/genai` 3.4.0 só em `gemini-client.ts`) e implementação falsa para os testes (`NODE_ENV=test`); a mídia entra no pipeline pela porta `DocumentExtractor` existente. Detalhes e limites em `ARCHITECTURE.md` §4.13.
+Áudio e vídeo são lidos por um **modelo Gemini de entendimento multimodal da família Flash** (`GEMINI_UNDERSTANDING_MODEL`, padrão `gemini-3.6-flash`, lido da documentação em 2026-11-17), pela **Files API**: o servidor envia os bytes da memória, espera o arquivo ficar `ACTIVE`, pede a transcrição com marcas `[MM:SS]` (e `SCENE:` no vídeo) com uma instrução fixa que **proíbe identificar pessoas pelo rosto ou pela voz** e trata a mídia como dado, e **apaga o arquivo no provedor ao fim de qualquer desfecho**. O cliente fica atrás da porta `MediaUnderstanding` (domínio) com adaptador (`GeminiMediaUnderstanding`, SDK `@google/genai` 3.4.0 só em `gemini-client.ts`) e implementação falsa para os testes (`NODE_ENV=test`); a mídia entra no pipeline pela porta `DocumentExtractor` existente. Detalhes e limites em `ARCHITECTURE.md` §4.14.
 
 Decisões que acompanham:
 

@@ -3,10 +3,10 @@
 > Spec executável. Preencha todas as seções; `TODO` é lacuna, não requisito.
 > Use `create-spec` para criar, `refine-spec` para auditar e `implement-me` para executar.
 
-- **Status:** pronta
+- **Status:** concluída (implementada em `feat/0029-experts-agent-observability`; revisão de cobertura dos tipos novos de conexão, `0026` a `0028`, pendente para a integração)
 - **Slug:** 0029-experts-agent-observability
 - **Data:** 2026-11-17
-- **Atualizado em:** 2026-11-17
+- **Atualizado em:** 2026-11-18
 - **Owner:** Time de engenharia (sinais, dashboard e alertas); Produto (limites de qualidade)
 - **Relacionados:** mapa `.plans/experts-breakdown.md` (fase 2); `.docs/ARCHITECTURE.md` §4.4 (catálogo de sinais, push OTLP, sem PII, `increase()` e eventos raros); ADRs `0010` (métricas por push OTLP) e `0016`; specs `0011` (observabilidade da API), `0012` (alertas), `0013` (Postgres); specs `0019`, `0022`, `0023`, `0024`, `0025`. **Depende de:** 0019, 0022, 0023, 0024 e 0025 (os sinais básicos que elas definem) e, se existirem, 0026 a 0028. **Destrava:** nenhuma spec.
 
@@ -74,17 +74,17 @@
 
 ## 6. Acceptance Criteria
 
-- [ ] Given uma mensagem com sucesso, Then o Tempo mostra `expert.message` com `expert.retrieve`, `expert.generate`, embeddings, índice e LLM como filhos.
-- [ ] Given falha do LLM, Then status `ERROR` e `expert.error_code`; given `Stop`, Then `aborted` sem `ERROR`.
-- [ ] Given o sentinela (pergunta, resposta, documento, nome do arquivo), Then não aparece em atributo de span, rótulo de métrica ou campo de log.
-- [ ] Given respostas de dois experts, Then as séries do R3 existem com os rótulos exatos e nada além.
-- [ ] Given o modelo falso com e sem informação de uso, Then os tokens são contados só quando informados.
-- [ ] Given um erro de resposta, Then log e trace estão ligados nos dois sentidos no Grafana.
-- [ ] Given `docker compose restart grafana`, Then o dashboard e o grupo `rondo-experts` existem e são válidos; `grafana-assets.spec.ts` passa.
-- [ ] Given falhas forçadas, Then uma regra do grupo muda para `Firing`; given sem tráfego, Then nenhuma dispara.
-- [ ] Given `LANGSMITH_TRACING=true` no ambiente, Then a API o desliga, registra o evento e **zero** requisições vão ao LangSmith.
-- [ ] Given o Collector parado, Then o chat segue sem erro e sem latência extra relevante.
-- [ ] Given `bun run lint`, `check-types`, `test` e `test:integration`, Then passam sem chamar OpenAI, Gemini nem LangSmith.
+- [x] Given uma mensagem com sucesso, Then o Tempo mostra `expert.message` com `expert.retrieve`, `expert.generate`, embeddings, índice e LLM como filhos.
+- [x] Given falha do LLM, Then status `ERROR` e `expert.error_code`; given `Stop`, Then `aborted` sem `ERROR`.
+- [x] Given o sentinela (pergunta, resposta, documento, nome do arquivo), Then não aparece em atributo de span, rótulo de métrica ou campo de log.
+- [x] Given respostas de dois experts, Then as séries do R3 existem com os rótulos exatos e nada além.
+- [x] Given o modelo falso com e sem informação de uso, Then os tokens são contados só quando informados.
+- [x] Given um erro de resposta, Then log e trace estão ligados nos dois sentidos no Grafana.
+- [x] Given `docker compose restart grafana`, Then o dashboard e o grupo `rondo-experts` existem e são válidos; `grafana-assets.spec.ts` passa.
+- [x] Given falhas forçadas, Then uma regra do grupo muda para `Firing`; given sem tráfego, Then nenhuma dispara.
+- [x] Given `LANGSMITH_TRACING=true` no ambiente, Then a API o desliga, registra o evento e **zero** requisições vão ao LangSmith.
+- [x] Given o Collector parado, Then o chat segue sem erro e sem latência extra relevante.
+- [x] Given `bun run lint`, `check-types`, `test` e `test:integration`, Then passam sem chamar OpenAI, Gemini nem LangSmith.
 
 ## 7. O que fazer
 
@@ -137,6 +137,10 @@ Como validar que a spec foi atendida:
 | **Premissa:** o trace guarda só identificadores técnicos e códigos de erro, nunca conteúdo, nem para depuração.                                          | Capacidade de depurar respostas ruins sem ver o texto.          | Não         | Produto/Jurídico   |
 | Pergunta: o Produto aceita depurar respostas ruins só por métricas, traces e reprodução com dados de teste, já que o conteúdo não é guardado?            | Processo de qualidade e a futura spec de avaliação offline.     | Não         | Produto            |
 | Pergunta: o Produto quer reabrir o LangSmith (licença Enterprise ou SaaS) para Evaluation e Studio no futuro?                                            | Backlog de avaliação e de Studio.                               | Não         | Produto            |
+| **Premissa (execução orquestrada, 2026-11-18):** as ingestões de imagem (`0026`), URL (`0027`) e áudio/vídeo (`0028`) não foram instrumentadas aqui; os sinais de conexões e de dependências são genéricos por `kind` e `dependency`, e a revisão de cobertura dos tipos novos (motivos de falha, `gemini`) acontece na integração. | Painéis e alerta de ingestão podem precisar de ajuste fino. | Não | Eng. |
+| **Premissa (execução, 2026-11-18):** `expert_retrieval_hits_*` (`scope` `all` ou `attached`) é um histograma novo ao lado de `expert_retrieval_chunks_*` da `0024` (`scope` `connections`), que continua como está, para não mudar o contrato da `0024`. | Duas séries do mesmo número até a `0024` ser simplificada. | Não | Eng. |
+| **Premissa (execução, 2026-11-18):** falha de dependência (Weaviate, OpenAI) alerta por contagem absoluta nos logs (mais de 2 em 10 min), não por percentual de 10%, por ser evento raro; falha de ingestão conta só `processing_unavailable` (problema do arquivo é do usuário). | Ruído versus cobertura; ajustável no `QA.md` §1.24. | Não | Eng./Produto |
+| **Premissa (execução, 2026-11-18):** um `Stop` e um estouro de timeout do primeiro token abortam o sinal da tentativa e não contam como falha da OpenAI no contador de dependências (o desfecho da mensagem, `timeout`, conta no `expert_message`). | Subcontagem de lentidão do provedor nos alertas de OpenAI. | Não | Eng. |
 
 ## 12. Refinamento
 
@@ -144,3 +148,4 @@ Como validar que a spec foi atendida:
 | ---------- | ---------------------- | ------------------------------------------------------- |
 | 2026-11-17 | Spec criada (rascunho) | Fase 2 do épico de experts (`breakdown-specs`).         |
 | 2026-11-17 | Cabeçalho (dependência da 0025), R7 (`uid`, `for`, `severity` e limiar) detalhado; R10 dividido em R10 (ADR e arquitetura, Must) e R11 (demais documentos, Should) | Auditoria: divergência com o mapa, regras de alerta do `DEVELOPMENT.md` §7 e `RULES.md` §5 (ADR) |
+| 2026-11-18 | Status `concluída`; critérios marcados; premissas da execução (cobertura dos tipos novos de conexão, `hits` ao lado de `chunks`, alertas por contagem, `Stop` e timeout) | Implementação em worktree orquestrado (`implement-me`) |

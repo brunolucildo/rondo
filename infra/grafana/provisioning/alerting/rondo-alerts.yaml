@@ -964,3 +964,284 @@ groups:
           severity: "warning"
           service: "rondo-postgres"
         isPaused: false
+  - orgId: 1
+    name: "rondo-experts"
+    folder: "Rondo"
+    interval: "1m"
+    rules:
+      - uid: "rondo-experts-falha-respostas"
+        title: "Respostas dos experts falhando (> 5%)"
+        condition: "C"
+        data:
+          - refId: "A"
+            relativeTimeRange:
+              from: 900
+              to: 0
+            datasourceUid: "loki"
+            model:
+              refId: "A"
+              datasource:
+                type: "loki"
+                uid: "loki"
+              expr: '(sum(count_over_time({service_name="rondo-api"} | event="expert_message" | outcome="failure" [10m])) / sum(count_over_time({service_name="rondo-api"} | event="expert_message" | outcome!="aborted" [10m]))) and (sum(count_over_time({service_name="rondo-api"} | event="expert_message" | outcome!="aborted" [10m])) >= 5)'
+              queryType: "instant"
+              editorMode: "code"
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: "B"
+            datasourceUid: "__expr__"
+            model:
+              refId: "B"
+              type: "reduce"
+              expression: "A"
+              reducer: "last"
+              settings:
+                mode: "dropNN"
+              datasource:
+                type: "__expr__"
+                uid: "__expr__"
+          - refId: "C"
+            datasourceUid: "__expr__"
+            model:
+              refId: "C"
+              type: "threshold"
+              expression: "B"
+              conditions:
+                - evaluator:
+                    type: "gt"
+                    params:
+                      - 0.05
+              datasource:
+                type: "__expr__"
+                uid: "__expr__"
+        noDataState: "OK"
+        execErrState: "Error"
+        for: "10m"
+        annotations:
+          summary: "Mais de 5% das respostas dos experts falharam"
+          description: "Falhas sobre respostas concluídas nos últimos 10 minutos, com pelo menos 5 respostas (contagem pelos logs expert_message; Stop não conta). Veja o dashboard Rondo — Experts, os códigos de falha e o trace do log."
+        labels:
+          severity: "critical"
+          service: "rondo-experts"
+        isPaused: false
+      - uid: "rondo-experts-primeiro-token-lento"
+        title: "Primeiro token lento (p95 > 5 s)"
+        condition: "C"
+        data:
+          - refId: "A"
+            relativeTimeRange:
+              from: 900
+              to: 0
+            datasourceUid: "mimir"
+            model:
+              refId: "A"
+              datasource:
+                type: "prometheus"
+                uid: "mimir"
+              expr: 'histogram_quantile(0.95, sum by (le) (rate(expert_first_token_seconds_bucket{job="rondo-api"}[10m]))) and on() (sum(increase(expert_first_token_seconds_count{job="rondo-api"}[10m])) >= 5)'
+              instant: true
+              range: false
+              editorMode: "code"
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: "B"
+            datasourceUid: "__expr__"
+            model:
+              refId: "B"
+              type: "reduce"
+              expression: "A"
+              reducer: "last"
+              settings:
+                mode: "dropNN"
+              datasource:
+                type: "__expr__"
+                uid: "__expr__"
+          - refId: "C"
+            datasourceUid: "__expr__"
+            model:
+              refId: "C"
+              type: "threshold"
+              expression: "B"
+              conditions:
+                - evaluator:
+                    type: "gt"
+                    params:
+                      - 5
+              datasource:
+                type: "__expr__"
+                uid: "__expr__"
+        noDataState: "OK"
+        execErrState: "Error"
+        for: "10m"
+        annotations:
+          summary: "O primeiro token dos experts está demorando mais de 5 s (p95)"
+          description: "p95 do tempo até o primeiro token por 10 minutos, com pelo menos 5 respostas. Veja a latência do LLM, dos embeddings e do índice no dashboard."
+        labels:
+          severity: "warning"
+          service: "rondo-experts"
+        isPaused: false
+      - uid: "rondo-experts-falhas-weaviate"
+        title: "Falhas do Weaviate (> 2 em 10 min)"
+        condition: "C"
+        data:
+          - refId: "A"
+            relativeTimeRange:
+              from: 900
+              to: 0
+            datasourceUid: "loki"
+            model:
+              refId: "A"
+              datasource:
+                type: "loki"
+                uid: "loki"
+              expr: 'sum(count_over_time({service_name="rondo-api"} | event="expert_dependency_failed" | dependency="weaviate" [10m]))'
+              queryType: "instant"
+              editorMode: "code"
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: "B"
+            datasourceUid: "__expr__"
+            model:
+              refId: "B"
+              type: "reduce"
+              expression: "A"
+              reducer: "last"
+              settings:
+                mode: "dropNN"
+              datasource:
+                type: "__expr__"
+                uid: "__expr__"
+          - refId: "C"
+            datasourceUid: "__expr__"
+            model:
+              refId: "C"
+              type: "threshold"
+              expression: "B"
+              conditions:
+                - evaluator:
+                    type: "gt"
+                    params:
+                      - 2
+              datasource:
+                type: "__expr__"
+                uid: "__expr__"
+        noDataState: "OK"
+        execErrState: "Error"
+        for: "0s"
+        annotations:
+          summary: "O índice vetorial (Weaviate) falhou mais de 2 vezes em 10 minutos"
+          description: "Contagem exata pelos logs expert_dependency_failed (evento raro: o contador perde o primeiro incremento). Confira o contêiner do Weaviate e o motivo (reason) no dashboard."
+        labels:
+          severity: "warning"
+          service: "rondo-experts"
+        isPaused: false
+      - uid: "rondo-experts-falhas-openai"
+        title: "Falhas da OpenAI (429 e 5xx, > 2 em 10 min)"
+        condition: "C"
+        data:
+          - refId: "A"
+            relativeTimeRange:
+              from: 900
+              to: 0
+            datasourceUid: "loki"
+            model:
+              refId: "A"
+              datasource:
+                type: "loki"
+                uid: "loki"
+              expr: 'sum(count_over_time({service_name="rondo-api"} | event="expert_dependency_failed" | dependency="openai" | reason=~"rate_limited|server_error|provider_error" [10m]))'
+              queryType: "instant"
+              editorMode: "code"
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: "B"
+            datasourceUid: "__expr__"
+            model:
+              refId: "B"
+              type: "reduce"
+              expression: "A"
+              reducer: "last"
+              settings:
+                mode: "dropNN"
+              datasource:
+                type: "__expr__"
+                uid: "__expr__"
+          - refId: "C"
+            datasourceUid: "__expr__"
+            model:
+              refId: "C"
+              type: "threshold"
+              expression: "B"
+              conditions:
+                - evaluator:
+                    type: "gt"
+                    params:
+                      - 2
+              datasource:
+                type: "__expr__"
+                uid: "__expr__"
+        noDataState: "OK"
+        execErrState: "Error"
+        for: "0s"
+        annotations:
+          summary: "A OpenAI respondeu 429 ou 5xx mais de 2 vezes em 10 minutos"
+          description: "Chat e embeddings, pelos logs expert_dependency_failed com reason rate_limited, server_error ou provider_error. Confira a cota, o limite de requisições e o status do provedor."
+        labels:
+          severity: "warning"
+          service: "rondo-experts"
+        isPaused: false
+      - uid: "rondo-experts-falhas-ingestao"
+        title: "Falhas de ingestão de conexões (> 10%)"
+        condition: "C"
+        data:
+          - refId: "A"
+            relativeTimeRange:
+              from: 900
+              to: 0
+            datasourceUid: "loki"
+            model:
+              refId: "A"
+              datasource:
+                type: "loki"
+                uid: "loki"
+              expr: '(sum(count_over_time({service_name="rondo-api"} | event="connection_ingested" | outcome="failure" | reason="processing_unavailable" [10m])) / sum(count_over_time({service_name="rondo-api"} | event="connection_ingested" | deduplicated="false" [10m]))) and (sum(count_over_time({service_name="rondo-api"} | event="connection_ingested" | deduplicated="false" [10m])) >= 5)'
+              queryType: "instant"
+              editorMode: "code"
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: "B"
+            datasourceUid: "__expr__"
+            model:
+              refId: "B"
+              type: "reduce"
+              expression: "A"
+              reducer: "last"
+              settings:
+                mode: "dropNN"
+              datasource:
+                type: "__expr__"
+                uid: "__expr__"
+          - refId: "C"
+            datasourceUid: "__expr__"
+            model:
+              refId: "C"
+              type: "threshold"
+              expression: "B"
+              conditions:
+                - evaluator:
+                    type: "gt"
+                    params:
+                      - 0.1
+              datasource:
+                type: "__expr__"
+                uid: "__expr__"
+        noDataState: "OK"
+        execErrState: "Error"
+        for: "10m"
+        annotations:
+          summary: "Mais de 10% das ingestões de conexões falharam por indisponibilidade do processamento"
+          description: "Falhas com reason processing_unavailable sobre as ingestões processadas nos últimos 10 minutos, com pelo menos 5 (logs connection_ingested). Problema do arquivo do usuário (sem texto, PDF protegido, arquivo grande) não conta."
+        labels:
+          severity: "warning"
+          service: "rondo-experts"
+        isPaused: false

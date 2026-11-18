@@ -1,4 +1,5 @@
 import { metrics, SpanStatusCode, trace } from "@opentelemetry/api";
+import { activeTraceFields } from "./agent-telemetry";
 import { DURATION_BUCKETS_SECONDS } from "./duration-buckets";
 import { type KnowledgeFailureReason } from "./knowledge-telemetry";
 import { baseLogger } from "./logger";
@@ -28,6 +29,78 @@ export interface ExpertMessageContext {
   /** One of the catalog ids (a closed set), never a value read from the request. */
   expertId: string;
   requestId?: string;
+  /** `performance.now()` when the request arrived: the clock of the duration and the first token. */
+  startedAt?: number;
+}
+
+/**
+ * The seven catalog ids (`modules/experts/domain/expert-catalog.ts`; a unit test keeps both lists
+ * equal). Anything else is `unknown`, so a metric label never takes a value the client controls.
+ */
+export const EXPERT_LABELS = [
+  "head-coach",
+  "performance-analyst",
+  "sports-lawyer",
+  "physiologist",
+  "sports-physician",
+  "physiotherapist",
+  "football-manager",
+] as const;
+
+const KNOWN_EXPERTS: ReadonlySet<string> = new Set(EXPERT_LABELS);
+
+export function expertLabelOf(expertId: string): string {
+  return KNOWN_EXPERTS.has(expertId) ? expertId : "unknown";
+}
+
+/** Answers last seconds, not milliseconds: the buckets reach the 120 s total timeout. */
+const ANSWER_DURATION_BUCKETS_SECONDS = [
+  0.1, 0.25, 0.5, 1, 2, 3, 5, 7.5, 10, 15, 20, 30, 45, 60, 90, 120,
+];
+
+function createMessageInstruments() {
+  const meter = metrics.getMeter(TRACER_NAME);
+
+  return {
+    duration: meter.createHistogram("expert.message.duration", {
+      description: "Time from the request to the end of the answer of an expert, by outcome.",
+      unit: "s",
+      advice: { explicitBucketBoundaries: ANSWER_DURATION_BUCKETS_SECONDS },
+    }),
+    firstToken: meter.createHistogram("expert.first_token", {
+      description: "Time from the request to the first token sent to the client.",
+      unit: "s",
+      advice: { explicitBucketBoundaries: ANSWER_DURATION_BUCKETS_SECONDS },
+    }),
+    tokens: meter.createCounter("expert.llm.tokens", {
+      description: "Tokens the provider reported for the answers, by direction.",
+      unit: "{token}",
+    }),
+    grounded: meter.createCounter("expert.grounded", {
+      description: "Answers by grounding: from a source, no source covers it, or no retrieval.",
+      unit: "{answer}",
+    }),
+  };
+}
+
+let messageInstruments: ReturnType<typeof createMessageInstruments> | undefined;
+
+// Created on first use: the API meter provider is only registered when the SDK starts.
+function getMessageInstruments() {
+  messageInstruments ??= createMessageInstruments();
+
+  return messageInstruments;
+}
+
+export type ExpertGrounded = "yes" | "gap" | "skipped";
+
+/** Counts one answer by grounding (`yes`: from a source; `gap`: no source covers it; `skipped`: no retrieval). */
+export function recordExpertGrounded(grounded: ExpertGrounded): void {
+  try {
+    getMessageInstruments().grounded.add(1, { grounded });
+  } catch {
+    // Telemetry must never change the answer.
+  }
 }
 
 /** Writes the `expert_message` log. Only ids, outcome, duration and token counts: never content. */
@@ -38,13 +111,14 @@ export function logExpertMessage(
 ): void {
   const fields = {
     event: "expert_message",
-    expertId: context.expertId,
+    expertId: expertLabelOf(context.expertId),
     outcome: result.outcome,
     reason: result.reason,
     durationMs,
     inputTokens: result.inputTokens,
     outputTokens: result.outputTokens,
     requestId: context.requestId,
+    ...activeTraceFields(),
   };
 
   if (result.outcome === "failure") {
@@ -56,23 +130,80 @@ export function logExpertMessage(
 }
 
 /**
- * Runs one answer inside the span `expert.message` (a child of the HTTP span) and writes the
- * `expert_message` log when it ends. The span carries the expert id, the outcome and token counts;
- * no message, prompt, history or provider text goes to the span or the log.
+ * The metrics and the log of one answer, once it ended: duration by outcome, the tokens the
+ * provider reported (never an estimate: without them an `expert_usage_unavailable` log says so),
+ * and the `expert_message` log. Never throws.
+ */
+export function recordExpertMessage(
+  context: ExpertMessageContext,
+  result: ExpertMessageResult,
+  durationMs: number,
+): void {
+  try {
+    const { duration, tokens } = getMessageInstruments();
+    const expert = expertLabelOf(context.expertId);
+
+    duration.record(durationMs / 1000, { expert, outcome: result.outcome });
+
+    if (result.inputTokens !== null && result.outputTokens !== null) {
+      tokens.add(result.inputTokens, { expert, direction: "input" });
+      tokens.add(result.outputTokens, { expert, direction: "output" });
+    } else if (result.outcome === "success") {
+      baseLogger.warn(
+        { event: "expert_usage_unavailable", expertId: expert, ...activeTraceFields() },
+        "expert_usage_unavailable",
+      );
+    }
+
+    logExpertMessage(context, result, durationMs);
+  } catch {
+    // Telemetry must never change the answer.
+  }
+}
+
+/** What the writer of the answer tells the telemetry while the answer streams. */
+export interface ExpertMessageProbe {
+  /** The first token went to the client. Only the first call counts. */
+  firstToken(): void;
+}
+
+/**
+ * Runs one answer inside the span `expert.message` (a child of the HTTP span) and records it when
+ * it ends. The span carries the expert id, the outcome, the closed `expert.error_code` (only on
+ * failure) and token counts; no message, prompt, history or provider text goes to the span, a
+ * metric or the log. `aborted` (the user pressed Stop) is not an error.
  */
 export async function traceExpertMessage(
   context: ExpertMessageContext,
-  run: () => Promise<ExpertMessageResult>,
+  run: (probe: ExpertMessageProbe) => Promise<ExpertMessageResult>,
 ): Promise<ExpertMessageResult> {
-  const startedAt = performance.now();
+  const startedAt = context.startedAt ?? performance.now();
+  let firstTokenSeen = false;
+  const probe: ExpertMessageProbe = {
+    firstToken() {
+      if (firstTokenSeen) {
+        return;
+      }
+
+      firstTokenSeen = true;
+
+      try {
+        getMessageInstruments().firstToken.record((performance.now() - startedAt) / 1000, {
+          expert: expertLabelOf(context.expertId),
+        });
+      } catch {
+        // Telemetry must never change the answer.
+      }
+    },
+  };
 
   return trace
     .getTracer(TRACER_NAME)
     .startActiveSpan(
       "expert.message",
-      { attributes: { "expert.id": context.expertId } },
+      { attributes: { "expert.id": expertLabelOf(context.expertId) } },
       async (span) => {
-        const result = await run().catch((): ExpertMessageResult => ({
+        const result = await run(probe).catch((): ExpertMessageResult => ({
           outcome: "failure",
           reason: "provider_error",
           inputTokens: null,
@@ -88,11 +219,13 @@ export async function traceExpertMessage(
         }
 
         if (result.outcome === "failure") {
+          span.setAttribute("expert.error_code", result.reason);
           span.setStatus({ code: SpanStatusCode.ERROR });
         }
 
         span.end();
-        logExpertMessage(context, result, Math.round(performance.now() - startedAt));
+        // Ended, but still the active span: the log gets its `trace_id` and `span_id`.
+        recordExpertMessage(context, result, Math.round(performance.now() - startedAt));
 
         return result;
       },
@@ -119,6 +252,8 @@ export interface ExpertRetrievalRecord {
   durationSeconds: number;
 }
 
+const CHUNK_BUCKETS = [0, 1, 2, 3, 4, 5, 6, 8, 12];
+
 function createRetrievalInstruments() {
   const meter = metrics.getMeter(TRACER_NAME);
 
@@ -135,7 +270,14 @@ function createRetrievalInstruments() {
     chunks: meter.createHistogram("expert.retrieval.chunks", {
       description: "Chunks that passed the similarity threshold for one question.",
       unit: "{chunk}",
-      advice: { explicitBucketBoundaries: [0, 1, 2, 3, 4, 5, 6, 8, 12] },
+      advice: { explicitBucketBoundaries: CHUNK_BUCKETS },
+    }),
+    // Spec 0029 (R3): the same count under the closed contract of the agent dashboard, whose
+    // scope is `all` or `attached` and which only counts retrievals that ran to the end.
+    hits: meter.createHistogram("expert.retrieval.hits", {
+      description: "Chunks recovered for one question, by scope (all the base or attached files).",
+      unit: "{chunk}",
+      advice: { explicitBucketBoundaries: CHUNK_BUCKETS },
     }),
   };
 }
@@ -152,12 +294,18 @@ function getRetrievalInstruments() {
 /** Counter, histograms and the `expert_retrieval` log of one retrieval. Never throws. */
 export function recordExpertRetrieval(record: ExpertRetrievalRecord): void {
   try {
-    const { retrievals, duration, chunks } = getRetrievalInstruments();
+    const { retrievals, duration, chunks, hits } = getRetrievalInstruments();
     const attributes = { outcome: record.outcome, scope: record.scope };
 
     retrievals.add(1, attributes);
     duration.record(record.durationSeconds, attributes);
     chunks.record(record.chunks, attributes);
+
+    if (record.outcome !== "failure") {
+      hits.record(record.chunks, {
+        scope: record.scope === "connections" ? "attached" : record.scope,
+      });
+    }
 
     const fields = {
       event: "expert_retrieval",
@@ -166,6 +314,7 @@ export function recordExpertRetrieval(record: ExpertRetrievalRecord): void {
       reason: record.reason,
       chunks: record.chunks,
       durationMs: Math.round(record.durationSeconds * 1000),
+      ...activeTraceFields(),
     };
 
     if (record.outcome === "failure") {

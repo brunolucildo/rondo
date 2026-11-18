@@ -283,7 +283,7 @@ describe("the messages of audio and video", () => {
       "Files can have at most 20 MB.",
     );
     expect(checkFileBeforeUpload(file("a.wav", 10))?.text).toBe(
-      "Only PDF, TXT, Markdown, MP3 and MP4 files are supported.",
+      "Only PDF, TXT, Markdown, JPG, PNG, MP3 and MP4 files are supported.",
     );
     expect(mediaKindOfFile({ name: "Clip.MP4" })).toBe("video");
     expect(mediaKindOfFile({ name: "notes.md" })).toBeNull();

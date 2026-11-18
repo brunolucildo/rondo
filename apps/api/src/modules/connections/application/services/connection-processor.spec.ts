@@ -71,6 +71,7 @@ function setup(
       pdf: extractor,
       txt: extractor,
       md: extractor,
+      image: extractor,
       audio: extractor,
       video: extractor,
     },

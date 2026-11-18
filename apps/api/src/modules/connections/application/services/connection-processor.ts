@@ -10,6 +10,7 @@ import type {
 } from "../../domain/connection-ports";
 import {
   EXTRACTION_TIMEOUT_MS,
+  IMAGE_EXTRACTION_TIMEOUT_MS,
   isMediaKind,
   MAX_CHUNKS_PER_CONNECTION,
   MAX_WAITING_MEDIA_JOBS,
@@ -90,11 +91,11 @@ function errorCodeOf(error: unknown): ConnectionErrorCode {
  */
 export class ConnectionProcessor {
   private readonly lanes: { document: Lane; media: Lane };
-  private readonly extractionTimeoutMs: number;
+  private readonly extractionTimeoutMs: number | undefined;
   private readonly mediaExtractionTimeoutMs: number;
 
   constructor(private readonly deps: ConnectionProcessorDependencies) {
-    this.extractionTimeoutMs = deps.extractionTimeoutMs ?? EXTRACTION_TIMEOUT_MS;
+    this.extractionTimeoutMs = deps.extractionTimeoutMs;
     this.mediaExtractionTimeoutMs = deps.mediaExtractionTimeoutMs ?? MEDIA_EXTRACTION_TIMEOUT_MS;
     this.lanes = {
       document: {
@@ -206,7 +207,10 @@ export class ConnectionProcessor {
     const chunker = media ? (this.deps.mediaChunker ?? this.deps.chunker) : this.deps.chunker;
     const sections = await withTimeout(
       extractors[connection.kind].extract(bytes),
-      media ? this.mediaExtractionTimeoutMs : this.extractionTimeoutMs,
+      media
+        ? this.mediaExtractionTimeoutMs
+        : (this.extractionTimeoutMs ??
+            (connection.kind === "image" ? IMAGE_EXTRACTION_TIMEOUT_MS : EXTRACTION_TIMEOUT_MS)),
     );
     const chunks = await chunker.chunk(sections);
 
