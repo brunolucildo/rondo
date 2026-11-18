@@ -31,6 +31,8 @@ function setup(options: { available?: boolean; clock?: { now: Date } } = {}) {
     traceIngestion: vi.fn(),
     recordDeduplicated: vi.fn(),
     recordDeletion: vi.fn(),
+    recordUrlFetch: vi.fn(),
+    recordRejected: vi.fn(),
   };
   const upload = new UploadConnection(
     repository,

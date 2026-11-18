@@ -8,6 +8,7 @@ import { BatchLogRecordProcessor } from "@opentelemetry/sdk-logs";
 import { PeriodicExportingMetricReader } from "@opentelemetry/sdk-metrics";
 import { NodeSDK } from "@opentelemetry/sdk-node";
 import { ATTR_SERVICE_NAME } from "@opentelemetry/semantic-conventions";
+import { isEgressRequest } from "./egress-requests";
 import { outgoingUrlAttributes, redactHttpRequestSpan } from "./span-redaction";
 
 const endpoint = (process.env.OTEL_EXPORTER_OTLP_ENDPOINT ?? "http://localhost:4318").replace(
@@ -53,7 +54,11 @@ export const sdk = new NodeSDK({
   instrumentations: [
     getNodeAutoInstrumentations({
       // Query strings carry PostgREST filters (e-mail, session id) and client input; IPs identify people.
-      "@opentelemetry/instrumentation-http": { requestHook: redactHttpRequestSpan },
+      "@opentelemetry/instrumentation-http": {
+        requestHook: redactHttpRequestSpan,
+        // Requests to links users connect: no span and no metric (host, path and query are theirs).
+        ignoreOutgoingRequestHook: isEgressRequest,
+      },
       "@opentelemetry/instrumentation-undici": { startSpanHook: outgoingUrlAttributes },
     }),
   ],

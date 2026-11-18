@@ -5,7 +5,6 @@ import { DirectoryLoader, UnknownHandling } from "@langchain/classic/document_lo
 import { TextLoader } from "@langchain/classic/document_loaders/fs/text";
 import type { BaseDocumentLoader } from "@langchain/core/document_loaders/base";
 import { PDFLoader } from "@langchain/community/document_loaders/fs/pdf";
-import type { ConnectionKind } from "../domain/connection";
 import { ConnectionProcessingError } from "../domain/connection-errors";
 import type { DocumentExtractor, ExtractedSection } from "../domain/connection-ports";
 
@@ -13,7 +12,7 @@ import type { DocumentExtractor, ExtractedSection } from "../domain/connection-p
  * The kinds read by a document loader; images go through `ImageDocumentExtractor` and audio and
  * video through `MediaDocumentExtractor`.
  */
-export type LoaderKind = Exclude<ConnectionKind, "image" | "audio" | "video">;
+export type LoaderKind = "pdf" | "txt" | "md";
 
 type LoaderFactory = (filePath: string) => BaseDocumentLoader;
 

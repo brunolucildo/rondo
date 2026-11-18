@@ -15,7 +15,7 @@ const METER_NAME = "rondo-api";
 /** Processing a minute of media takes seconds to a few minutes: the default buckets stop at 10 s. */
 const MEDIA_PER_MINUTE_BUCKETS_SECONDS = [0.5, 1, 2, 3, 5, 7.5, 10, 15, 20, 30, 60, 120];
 
-export type ConnectionIngestionKind = "pdf" | "txt" | "md" | "image" | "audio" | "video";
+export type ConnectionIngestionKind = "pdf" | "txt" | "md" | "image" | "url" | "audio" | "video";
 export type ConnectionIngestionOutcome = "success" | "failure";
 
 /** Closed set for the `reason` of a failed ingestion (the lower-case error codes). */
@@ -25,6 +25,12 @@ export type ConnectionIngestionReason =
   | "pdf_protected"
   | "too_many_chunks"
   | "processing_unavailable"
+  | "url_not_allowed"
+  | "fetch_failed"
+  | "fetch_timeout"
+  | "response_too_large"
+  | "unsupported_content_type"
+  | "too_many_redirects"
   | "media_unreadable"
   | "content_not_processable";
 
@@ -79,6 +85,15 @@ function createInstruments() {
         "Deletions of the file sent to the media provider (spec 0028), by outcome: deleted, pending (failed, retried later) or retried.",
       unit: "{cleanup}",
     }),
+    urlBlocked: meter.createCounter("url_fetch.blocked", {
+      description: "Links refused by the egress rules (spec 0027), by reason.",
+      unit: "{request}",
+    }),
+    urlFetchDuration: meter.createHistogram("url_fetch.duration", {
+      description: "Time to fetch a link (spec 0027), by outcome.",
+      unit: "s",
+      advice: { explicitBucketBoundaries: DURATION_BUCKETS_SECONDS },
+    }),
   };
 }
 
@@ -97,6 +112,48 @@ export type VisionCallOutcome = "success" | "refused" | "unavailable";
 export function recordVisionCall(outcome: VisionCallOutcome, durationSeconds: number): void {
   try {
     getInstruments().vision.record(durationSeconds, { outcome });
+  } catch {
+    // Telemetry must never change the answer.
+  }
+}
+
+export type UrlBlockMetricReason = "scheme" | "port" | "credentials" | "address" | "redirect";
+
+export interface UrlFetchTelemetry {
+  outcome: "success" | "failure" | "blocked";
+  reason: "none" | UrlBlockMetricReason | ConnectionIngestionReason;
+  durationSeconds: number;
+  sizeBytes: number;
+}
+
+/**
+ * Counter, histogram and `url_fetch` log of one search of a link (spec 0027). The dimensions are
+ * closed sets; the log carries the outcome, the reason, the duration and the size. Never the link,
+ * the host, the path, an address or any content. Never throws.
+ */
+export function recordUrlFetch(record: UrlFetchTelemetry): void {
+  try {
+    const { urlBlocked, urlFetchDuration } = getInstruments();
+
+    if (record.outcome === "blocked") {
+      urlBlocked.add(1, { reason: record.reason });
+    }
+
+    urlFetchDuration.record(record.durationSeconds, { outcome: record.outcome });
+
+    const fields = {
+      event: "url_fetch",
+      outcome: record.outcome,
+      reason: record.reason,
+      durationMs: Math.round(record.durationSeconds * 1000),
+      sizeBytes: record.sizeBytes,
+    };
+
+    if (record.outcome === "success") {
+      baseLogger.info(fields, "url_fetch");
+    } else {
+      baseLogger.warn(fields, "url_fetch");
+    }
   } catch {
     // Telemetry must never change the answer.
   }

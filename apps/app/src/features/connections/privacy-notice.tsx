@@ -76,11 +76,12 @@ export function PrivacyNotice({ onAccept, onCancel, media = false }: PrivacyNoti
           Before you connect a file
         </h2>
         <p id={descriptionId} className="text-base">
-          The content of the file is sent to an AI provider to be turned into searchable data
-          (embeddings). Images are sent to the AI provider too, to be described and read as text.{" "}
+          The content of the file, or of the page behind a link, is sent to an AI provider to be
+          turned into searchable data (embeddings). Images are sent to the AI provider too, to be
+          described and read as text.{" "}
           {media ? MEDIA_NOTICE : null}Personal and health data must only be used with the
-          authorization of the people concerned. The original file is not kept: only the extracted
-          text is stored.
+          authorization of the people concerned. The original file or page is not kept: only the
+          extracted text is stored. The address of a link is not kept either.
         </p>
         <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           <Button variant="outline" onClick={onCancel}>

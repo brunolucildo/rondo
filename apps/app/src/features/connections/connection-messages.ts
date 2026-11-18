@@ -48,7 +48,7 @@ export type ConnectionStatus = "processing" | "ready" | "failed";
 export interface ConnectionDto {
   id: string;
   name: string;
-  kind: "pdf" | "txt" | "md" | "image" | "audio" | "video";
+  kind: "pdf" | "txt" | "md" | "image" | "url" | "audio" | "video";
   sizeBytes: number;
   /** Seconds of an audio or video; `null` for the other kinds. */
   durationSeconds?: number | null;
@@ -82,6 +82,22 @@ const BY_PROCESSING_CODE: Record<string, FailureMessage> = {
     text: "We couldn't process this file right now. Try again in a moment.",
     retryable: true,
   },
+  // Links (spec 0027). The reason of a blocked link is never explained: only that it can't be used.
+  URL_NOT_ALLOWED: { text: "This link can't be used.", retryable: false },
+  FETCH_FAILED: { text: "We couldn't open this link. Check it and try again.", retryable: true },
+  FETCH_TIMEOUT: {
+    text: "The page took too long to answer. Try again in a moment.",
+    retryable: true,
+  },
+  RESPONSE_TOO_LARGE: {
+    text: "This page is too large. Links can have at most 5 MB.",
+    retryable: false,
+  },
+  UNSUPPORTED_CONTENT_TYPE: {
+    text: "This link must lead to a web page, a text file, Markdown or a PDF.",
+    retryable: false,
+  },
+  TOO_MANY_REDIRECTS: { text: "This link redirects too many times.", retryable: false },
   MEDIA_UNREADABLE: {
     text: "We couldn't read this audio or video. Export it again as MP3 or MP4 and try again.",
     retryable: false,
@@ -114,6 +130,27 @@ const BY_IMAGE_PROCESSING_CODE: Record<string, FailureMessage> = {
   },
 };
 
+/** What `NO_EXTRACTABLE_TEXT` and `PDF_PROTECTED` say when the source is a link, not a file. */
+const BY_LINK_CODE: Record<string, FailureMessage> = {
+  NO_EXTRACTABLE_TEXT: {
+    text: "We couldn't find any text on this page. Pages that need a login or JavaScript are not supported.",
+    retryable: false,
+  },
+  PDF_PROTECTED: {
+    text: "This PDF is protected by a password and can't be used.",
+    retryable: false,
+  },
+  PROCESSING_UNAVAILABLE: {
+    text: "We couldn't process this link right now. Try again in a moment.",
+    retryable: true,
+  },
+};
+
+const GENERIC_LINK: FailureMessage = {
+  text: "We couldn't connect this link. Try again in a moment.",
+  retryable: true,
+};
+
 const GENERIC: FailureMessage = {
   text: "We couldn't connect this file. Try again in a moment.",
   retryable: true,
@@ -125,17 +162,21 @@ export function describeProcessingFailure(
   kind?: ConnectionDto["kind"],
 ): FailureMessage {
   if (errorCode === null) {
-    return GENERIC;
+    return kind === "url" ? GENERIC_LINK : GENERIC;
   }
 
   if (errorCode === "NO_EXTRACTABLE_TEXT" && (kind === "audio" || kind === "video")) {
     return NO_TEXT_IN_MEDIA;
   }
 
+  if (kind === "url" && BY_LINK_CODE[errorCode] !== undefined) {
+    return BY_LINK_CODE[errorCode];
+  }
+
   return (
     (kind === "image" ? BY_IMAGE_PROCESSING_CODE[errorCode] : undefined) ??
     BY_PROCESSING_CODE[errorCode] ??
-    GENERIC
+    (kind === "url" ? GENERIC_LINK : GENERIC)
   );
 }
 
@@ -192,6 +233,81 @@ export function describeUploadFailure(error: unknown, fileName = ""): FailureMes
       };
     default:
       return GENERIC;
+  }
+}
+
+/** The message of a refused link (a 4xx, 5xx or a network failure of `POST /connections/url`). */
+export function describeLinkFailure(error: unknown): FailureMessage {
+  if (!(error instanceof ApiError)) {
+    return GENERIC_LINK;
+  }
+
+  switch (error.code) {
+    case "INVALID_URL":
+      return { text: "Enter a valid link that starts with http:// or https://.", retryable: false };
+    case "VALIDATION_FAILED":
+      return { text: "Links can have at most 2,048 characters.", retryable: false };
+    case "CONNECTION_LIMIT_REACHED":
+      return { text: "You reached the limit of 50 connections.", retryable: false };
+    case "RATE_LIMITED":
+      return { text: "Too many links. Try again in a few minutes.", retryable: true };
+    case "NETWORK_ERROR":
+      return {
+        text: "We couldn't reach the server. Check your connection and try again.",
+        retryable: true,
+      };
+    default:
+      return describeProcessingFailure(error.code, "url");
+  }
+}
+
+const MAX_LINK_LENGTH = 2048;
+
+/**
+ * The message for a link the browser already knows is wrong (not a plain http(s) link), or `null`
+ * when it can be sent. The server checks everything again; this only saves a round trip.
+ */
+export function checkLinkBeforeSend(text: string): string | null {
+  const value = text.trim();
+
+  if (value === "") {
+    return "Enter a link.";
+  }
+
+  if (value.length > MAX_LINK_LENGTH) {
+    return "Links can have at most 2,048 characters.";
+  }
+
+  try {
+    const url = new URL(value);
+
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
+      return "Links must start with http:// or https://.";
+    }
+
+    if (url.username !== "" || url.password !== "") {
+      return "Links can't contain a user name or password.";
+    }
+
+    if (url.port !== "" && url.port !== "80" && url.port !== "443") {
+      return "Links can only use the default web ports.";
+    }
+
+    return null;
+  } catch {
+    return "Enter a valid link that starts with http:// or https://.";
+  }
+}
+
+/** What the chip of a link shows: host and path, never the query or the fragment (they may hold a token). */
+export function linkLabel(text: string): string {
+  try {
+    const url = new URL(text.trim());
+    const path = url.pathname === "/" ? "" : url.pathname.replace(/\/+$/, "");
+
+    return `${url.host}${path}`;
+  } catch {
+    return "Link";
   }
 }
 
@@ -262,6 +378,7 @@ const KIND_LABEL: Record<ConnectionDto["kind"], string> = {
   txt: "TXT",
   md: "Markdown",
   image: "Image",
+  url: "Link",
   audio: "Audio",
   video: "Video",
 };

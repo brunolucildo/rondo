@@ -1,4 +1,4 @@
-import type { Connection, ConnectionKind } from "./connection";
+import type { Connection, ConnectionKind, FileConnectionKind } from "./connection";
 
 /** Largest accepted document: PDF, TXT or Markdown (spec 0023, R2). */
 export const MAX_FILE_BYTES = 20 * 1024 * 1024;
@@ -14,6 +14,8 @@ export const MAX_BYTES_BY_KIND: Readonly<Record<ConnectionKind, number>> = {
   txt: MAX_FILE_BYTES,
   md: MAX_FILE_BYTES,
   image: MAX_IMAGE_BYTES,
+  // A link is not uploaded: this is the limit of the page the fetch client accepts (spec 0027).
+  url: 5 * MB,
   audio: 50 * MB,
   video: 200 * MB,
 };
@@ -105,7 +107,7 @@ export function isUuidLike(value: string): boolean {
   return UUID.test(value);
 }
 
-const KIND_BY_EXTENSION: Readonly<Record<string, ConnectionKind>> = {
+const KIND_BY_EXTENSION: Readonly<Record<string, FileConnectionKind>> = {
   pdf: "pdf",
   txt: "txt",
   md: "md",
@@ -134,7 +136,7 @@ const ACCEPTED_CONTENT_TYPES: ReadonlySet<string> = new Set([
   "",
 ]);
 
-const EXTENSION_OF_KIND: Readonly<Record<ConnectionKind, string>> = {
+const EXTENSION_OF_KIND: Readonly<Record<FileConnectionKind, string>> = {
   pdf: "pdf",
   txt: "txt",
   md: "md",
@@ -154,7 +156,7 @@ const IMAGE_CONTENT_TYPES: ReadonlySet<string> = new Set([
 ]);
 
 /** `plan.PDF` gives `pdf`; a name without a supported extension gives `null`. */
-export function kindOfFileName(fileName: string): ConnectionKind | null {
+export function kindOfFileName(fileName: string): FileConnectionKind | null {
   const dot = fileName.lastIndexOf(".");
 
   if (dot < 0) {
@@ -185,7 +187,7 @@ export function maxBytesOfKind(kind: ConnectionKind): number {
  * The name shown back to the user: no directories, no control characters, at most 255 characters.
  * Browsers send the bare name already; this protects against clients that send a path.
  */
-export function sanitizeFileName(rawName: string, kind: ConnectionKind): string {
+export function sanitizeFileName(rawName: string, kind: FileConnectionKind): string {
   const base = rawName.split(/[\\/]/).at(-1) ?? "";
   const printable = Array.from(base).filter((character) => {
     const code = character.codePointAt(0) ?? 0;

@@ -3,10 +3,10 @@
 > Spec executável. Preencha todas as seções; `TODO` é lacuna, não requisito.
 > Use `create-spec` para criar, `refine-spec` para auditar e `implement-me` para executar.
 
-- **Status:** pronta
+- **Status:** concluída
 - **Slug:** 0027-connections-url
 - **Data:** 2026-11-17
-- **Atualizado em:** 2026-11-17
+- **Atualizado em:** 2026-11-18
 - **Owner:** Produto (limites e textos); Engenharia (execução e segurança de rede)
 - **Relacionados:** mapa `.plans/experts-breakdown.md` (fase 2); specs `0023` (pipeline, dedup e porta de extrator), `0024`, `0025`, `0022`; `.docs/ARCHITECTURE.md` §7 (toda integração externa tem timeout, retry limitado e logs sem PII); `.docs/DEVELOPMENT.md` §7. **Depende de:** 0023, 0024, 0025. **Destrava:** nenhuma spec.
 
@@ -142,6 +142,10 @@ Como validar que a spec foi atendida:
 | Pergunta: há restrição jurídica para guardar o texto de páginas de terceiros (direitos autorais) na base do usuário?                       | Texto do aviso e retenção.                       | Não         | Jurídico           |
 | **Premissa:** o limite de envios de links é por IP (política `connection-url`), pelo mesmo motivo da 0019. | Abuso de busca de saída por contas atrás do mesmo IP. | Não | Eng. |
 | **Premissa:** nos testes (`NODE_ENV=test`) o cliente de busca é um fake injetado; o E2E nunca acessa a internet nem um servidor local pelo cliente real. | Testar o caminho feliz sem enfraquecer a proteção SSRF. | Não | Eng. |
+| **Premissa (implementação, 0027):** a busca e a extração rodam no próprio `POST` (até ~35 s: 2 tentativas de 15 s) e só a indexação segue em segundo plano; falhas da busca ou da extração (`URL_NOT_ALLOWED`, `FETCH_*`, `RESPONSE_TOO_LARGE`, `UNSUPPORTED_CONTENT_TYPE`, `TOO_MANY_REDIRECTS`, `NO_EXTRACTABLE_TEXT`) voltam como erro HTTP (`400` ou `422`) com o código e **não criam linha**; a interface as mostra no chip `failed`. | A dedup por conteúdo responde com a conexão da primeira URL e não existe linha sem hash. | Não | Eng. |
+| **Premissa (implementação, 0027):** `name` é o nome de exibição (título ou `host/caminho`); a migration acrescenta só `url_hash` e libera `kind = 'url'` (reconstruindo o check a partir dos tipos já permitidos, porque as specs 0026 e 0028 também o alteram). | Sem coluna redundante e sem desfazer os tipos das outras specs. | Não | Eng. |
+| **Premissa (implementação, 0027):** timeout não é repetido (só falha de rede e 5xx); redirecionamento `http` e `https` entre si é permitido; `localhost`, `*.localhost`, `*.local` e `*.internal` são recusados pelo nome; sem `robots.txt`, `User-Agent` `Rondo-Link-Fetcher/1.0`; no máximo 4 buscas simultâneas (acima disso `503 PROCESSING_UNAVAILABLE`). | Conservador e testável. | Não | Eng. |
+| **Premissa (implementação, 0027):** na interface, "Add connection" continua abrindo o seletor de arquivos; o campo "Link" vive no controle irmão "Add link" (diálogo), com o mesmo chip e o mesmo aviso de privacidade. | Não quebra o fluxo de arquivos (0023 e 0025). | Não | Produto/Eng. |
 
 ## 12. Refinamento
 
@@ -149,3 +153,4 @@ Como validar que a spec foi atendida:
 | ---------- | ---------------------- | ------------------------------------------------------- |
 | 2026-11-17 | Spec criada (rascunho) | Fase 2 do épico de experts (`breakdown-specs`).         |
 | 2026-11-17 | R1 (limite por IP), R2 (IPv4 embutido em IPv6) e critério ajustados; R11 (ADR e documentação, Must) acrescentado a partir do escopo; passo 7 define o fake de busca nos testes; premissas | Auditoria: o limitador não enxerga o usuário; faltava a forma `::ffff:`; o ADR estava só no escopo, sem requisito; testes de caminho feliz esbarrariam na própria proteção SSRF |
+| 2026-11-18 | Premissas de implementação registradas (§11); status atualizado | Execução orquestrada: lacunas reversíveis fechadas com o default conservador |

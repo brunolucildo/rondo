@@ -15,9 +15,11 @@ import {
   checkFileBeforeUpload,
   type ConnectionDto,
   describeProcessingFailure,
+  describeLinkFailure,
   describeUploadFailure,
   type FailureMessage,
   MAX_SIMULTANEOUS_MEDIA,
+  linkLabel,
   mediaKindOfFile,
 } from "./connection-messages";
 import { PrivacyNotice } from "./privacy-notice";
@@ -47,9 +49,16 @@ export interface AttachmentView {
   media: boolean;
 }
 
+/** What the person attached: a file, or a link. A link lives in memory only, to be sent again on retry. */
+type AttachmentSource = { kind: "file"; file: File } | { kind: "link"; url: string };
+
+/** An audio or a video (only a file can be one): it waits for its turn. */
+const isMediaSource = (source: AttachmentSource): boolean =>
+  source.kind === "file" && mediaKindOfFile(source.file) !== null;
+
 interface Attachment {
   id: string;
-  file: File;
+  source: AttachmentSource;
   /** False while a media waits for a free slot (at most 2 media are sent at once). */
   started: boolean;
   /** Counts the times the file was sent again, so a start is never done twice. */
@@ -100,7 +109,7 @@ function reducer(state: readonly Attachment[], action: Action): Attachment[] {
               problem: null,
               attempt: item.attempt + 1,
               // A document is sent again at once; a media goes back to the line for a slot.
-              started: mediaKindOfFile(item.file) === null,
+              started: !isMediaSource(item.source),
             }
           : item,
       );
@@ -175,6 +184,8 @@ interface AttachmentsContextValue {
   /** True while a file is uploading, processing or was refused by the server: `Send` must wait. */
   isBusy: boolean;
   addFile: (file: File) => void;
+  /** Connects a link (spec 0027); the privacy notice comes first on the first use. */
+  addLink: (url: string) => void;
   removeAttachment: (id: string) => void;
   retryAttachment: (id: string) => void;
   /** Drops the chips that are not in progress (the message was sent). */
@@ -201,8 +212,8 @@ const NO_REMOVED_CONNECTIONS: ReadonlySet<string> = new Set();
 function viewOf(item: Attachment, connection: ConnectionDto | undefined): AttachmentView {
   const base = {
     id: item.id,
-    name: item.file.name,
-    media: mediaKindOfFile(item.file) !== null,
+    name: item.source.kind === "file" ? item.source.file.name : linkLabel(item.source.url),
+    media: isMediaSource(item.source),
   };
 
   if (item.rejection !== null) {
@@ -249,13 +260,16 @@ function viewOf(item: Attachment, connection: ConnectionDto | undefined): Attach
 export function AttachmentsProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const [items, dispatch] = useReducer(reducer, []);
-  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [pendingSource, setPendingSource] = useState<AttachmentSource | null>(null);
   /** Starts already done (`id#attempt`), so the effect below never sends a file twice. */
   const startedKeys = useRef(new Set<string>());
   const [removedConnectionIds, setRemovedConnectionIds] = useState<ReadonlySet<string>>(new Set());
   const counter = useRef(0);
   const { mutateAsync } = useMutation({
-    mutationFn: (file: File) => uploadClient.postFile<ConnectionDto>("/connections", file),
+    mutationFn: (source: AttachmentSource) =>
+      source.kind === "file"
+        ? uploadClient.postFile<ConnectionDto>("/connections", source.file)
+        : apiClient.post<ConnectionDto>("/connections/url", { url: source.url }),
   });
 
   // One query per connection: the same file attached twice is one connection (deduplication).
@@ -271,33 +285,40 @@ export function AttachmentsProvider({ children }: { children: ReactNode }) {
   );
 
   const send = useCallback(
-    async (id: string, file: File) => {
+    async (id: string, source: AttachmentSource) => {
       try {
-        const connection = await mutateAsync(file);
+        const connection = await mutateAsync(source);
 
         queryClient.setQueryData(["connections", connection.id], connection);
         dispatch({ type: "sent", id, connectionId: connection.id });
       } catch (error) {
-        dispatch({ type: "rejected", id, rejection: describeUploadFailure(error, file.name) });
+        dispatch({
+          type: "rejected",
+          id,
+          rejection:
+            source.kind === "file"
+              ? describeUploadFailure(error, source.file.name)
+              : describeLinkFailure(error),
+        });
       }
     },
     [mutateAsync, queryClient],
   );
 
   const start = useCallback(
-    (file: File) => {
+    (source: AttachmentSource) => {
       counter.current += 1;
 
       const id = `attachment-${counter.current}`;
-      const refusal = checkFileBeforeUpload(file);
+      const refusal = source.kind === "file" ? checkFileBeforeUpload(source.file) : null;
 
-      const waitsForATurn = refusal === null && mediaKindOfFile(file) !== null;
+      const waitsForATurn = refusal === null && isMediaSource(source);
 
       dispatch({
         type: "added",
         attachment: {
           id,
-          file,
+          source,
           started: !waitsForATurn,
           attempt: 0,
           connectionId: null,
@@ -308,21 +329,27 @@ export function AttachmentsProvider({ children }: { children: ReactNode }) {
 
       // A media waits in line for one of the slots (see the effect below); a document goes now.
       if (refusal === null && !waitsForATurn) {
-        void send(id, file);
+        void send(id, source);
       }
     },
     [send],
   );
 
-  const addFile = useCallback(
-    (file: File) => {
-      if (readPrivacyAccepted(mediaKindOfFile(file) !== null)) {
-        start(file);
+  const addSource = useCallback(
+    (source: AttachmentSource) => {
+      if (readPrivacyAccepted(isMediaSource(source))) {
+        start(source);
       } else {
-        setPendingFile(file);
+        setPendingSource(source);
       }
     },
     [start],
+  );
+
+  const addFile = useCallback((file: File) => addSource({ kind: "file", file }), [addSource]);
+  const addLink = useCallback(
+    (url: string) => addSource({ kind: "link", url: url.trim() }),
+    [addSource],
   );
 
   const connectionsDeleted = useCallback(
@@ -341,7 +368,7 @@ export function AttachmentsProvider({ children }: { children: ReactNode }) {
   // wait their turn here, in the order they were added. The server also enforces it (409).
   const mediaInFlight = items.filter(
     (item, position) =>
-      mediaKindOfFile(item.file) !== null &&
+      isMediaSource(item.source) &&
       item.started &&
       (views[position]?.phase === "uploading" || views[position]?.phase === "processing"),
   ).length;
@@ -360,13 +387,13 @@ export function AttachmentsProvider({ children }: { children: ReactNode }) {
         !item.started &&
         item.rejection === null &&
         item.problem === null &&
-        mediaKindOfFile(item.file) !== null &&
+        isMediaSource(item.source) &&
         !startedKeys.current.has(key)
       ) {
         startedKeys.current.add(key);
         free -= 1;
         dispatch({ type: "started", id: item.id });
-        void send(item.id, item.file);
+        void send(item.id, item.source);
       }
     }
   }, [items, mediaInFlight, send]);
@@ -384,6 +411,7 @@ export function AttachmentsProvider({ children }: { children: ReactNode }) {
           view.phase === "waiting" || view.phase === "uploading" || view.phase === "processing",
       ),
     addFile,
+    addLink,
     removeAttachment: (id) => dispatch({ type: "removed", id }),
     retryAttachment: (id) => {
       const item = items.find((candidate) => candidate.id === id);
@@ -392,8 +420,8 @@ export function AttachmentsProvider({ children }: { children: ReactNode }) {
         dispatch({ type: "restarted", id });
 
         // A media goes back to the line (the effect starts it when a slot is free).
-        if (mediaKindOfFile(item.file) === null) {
-          void send(id, item.file);
+        if (!isMediaSource(item.source)) {
+          void send(id, item.source);
         }
       }
     },
@@ -424,15 +452,15 @@ export function AttachmentsProvider({ children }: { children: ReactNode }) {
   return (
     <AttachmentsContext.Provider value={value}>
       {children}
-      {pendingFile === null ? null : (
+      {pendingSource === null ? null : (
         <PrivacyNotice
-          media={mediaKindOfFile(pendingFile) !== null}
+          media={isMediaSource(pendingSource)}
           onAccept={() => {
-            rememberPrivacyAccepted(mediaKindOfFile(pendingFile) !== null);
-            start(pendingFile);
-            setPendingFile(null);
+            rememberPrivacyAccepted(isMediaSource(pendingSource));
+            start(pendingSource);
+            setPendingSource(null);
           }}
-          onCancel={() => setPendingFile(null)}
+          onCancel={() => setPendingSource(null)}
         />
       )}
     </AttachmentsContext.Provider>

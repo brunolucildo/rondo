@@ -5,6 +5,7 @@ import { Spinner } from "@repo/ui/spinner";
 import { Textarea } from "@repo/ui/textarea";
 import { type FormEvent, type KeyboardEvent, useId, useLayoutEffect, useRef } from "react";
 import { AddConnectionButton } from "../connections/add-connection-button";
+import { AddLinkButton } from "../connections/add-link-button";
 import { AttachmentChips } from "../connections/attachment-chips";
 import { ConnectionsButton } from "../connections/connections-button";
 import { useAttachments } from "../connections/use-attachments";
@@ -96,9 +97,10 @@ export function Composer({
 
   return (
     <div className="sticky bottom-0 z-10 border-t-2 border-border bg-card pb-[env(safe-area-inset-bottom)]">
-      <div className="absolute -top-14 right-4 flex gap-2">
+      <div className="absolute bottom-full right-4 mb-3 flex max-w-[calc(100%-2rem)] flex-wrap justify-end gap-2">
         <ConnectionsButton />
         <AddConnectionButton />
+        <AddLinkButton />
       </div>
       <form
         aria-label="Send a message"

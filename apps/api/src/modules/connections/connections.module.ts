@@ -13,6 +13,7 @@ import {
   KnowledgeModule,
 } from "../knowledge";
 import { ConnectionProcessor } from "./application/services/connection-processor";
+import { ConnectUrl } from "./application/use-cases/connect-url.use-case";
 import { DeleteAllConnections } from "./application/use-cases/delete-all-connections.use-case";
 import { DeleteConnection } from "./application/use-cases/delete-connection.use-case";
 import { GetConnection } from "./application/use-cases/get-connection.use-case";
@@ -24,6 +25,7 @@ import type {
   ImageDescriber,
 } from "./domain/connection-ports";
 import type { MediaUnderstanding } from "./domain/media-understanding";
+import type { UrlContentExtractor, UrlFetcher } from "./domain/url-fetch";
 import { parseVisionConfig } from "./domain/vision-config";
 import {
   CONNECTION_REPOSITORY,
@@ -31,8 +33,11 @@ import {
   CONNECTIONS_DATABASE,
   IMAGE_DESCRIBER,
   MEDIA_UNDERSTANDING,
+  URL_CONTENT_EXTRACTOR,
+  URL_FETCHER,
 } from "./connections.tokens";
 import { createImageDescriber } from "./infrastructure/create-image-describer";
+import { createScriptedWeb } from "./infrastructure/fake-web";
 import { FakeMediaUnderstanding } from "./infrastructure/fake-media-understanding";
 import { createGeminiClient } from "./infrastructure/gemini-client";
 import {
@@ -43,10 +48,14 @@ import { ImageDocumentExtractor } from "./infrastructure/image-document-extracto
 import { MediaDocumentExtractor } from "./infrastructure/media-document-extractor";
 import { TimedTextChunker } from "./infrastructure/timed-text-chunker";
 import { LangChainDocumentExtractor } from "./infrastructure/langchain-document-extractor";
+import { LangChainUrlContentExtractor } from "./infrastructure/langchain-url-content-extractor";
+import { NodeHttpTransport, SystemDnsResolver } from "./infrastructure/node-http-transport";
 import { NodeContentHasher } from "./infrastructure/node-content-hasher";
 import { OtelConnectionTelemetry } from "./infrastructure/otel-connection-telemetry";
 import { PostgresConnectionRepository } from "./infrastructure/postgres-connection.repository";
+import { ProtectedUrlFetcher } from "./infrastructure/protected-url-fetcher";
 import { RecursiveTextChunker } from "./infrastructure/recursive-text-chunker";
+import { ConnectUrlRequestHandler } from "./interface/request-handlers/connect-url.request-handler";
 import { DeleteAllConnectionsRequestHandler } from "./interface/request-handlers/delete-all-connections.request-handler";
 import { DeleteConnectionRequestHandler } from "./interface/request-handlers/delete-connection.request-handler";
 import { GetConnectionRequestHandler } from "./interface/request-handlers/get-connection.request-handler";
@@ -65,6 +74,7 @@ import { UploadConnectionRequestHandler } from "./interface/request-handlers/upl
   imports: [KnowledgeModule],
   controllers: [
     UploadConnectionRequestHandler,
+    ConnectUrlRequestHandler,
     ListConnectionsRequestHandler,
     GetConnectionRequestHandler,
     DeleteConnectionRequestHandler,
@@ -175,6 +185,51 @@ import { UploadConnectionRequestHandler } from "./interface/request-handlers/upl
           telemetry,
           () => new Date(),
           () => media.isAvailable(),
+        ),
+    },
+    {
+      // The only way out to a link (spec 0027). With `NODE_ENV=test` the protection is the real one
+      // but the resolver and the transport are scripted in memory: no request leaves the machine,
+      // and there is no exception list for internal addresses in any environment.
+      provide: URL_FETCHER,
+      inject: [ConfigService],
+      useFactory: (config: ConfigService): UrlFetcher => {
+        if (resolveNodeEnv({ NODE_ENV: config.get<string>("NODE_ENV") }) === "test") {
+          const { resolver, transport } = createScriptedWeb();
+
+          return new ProtectedUrlFetcher(resolver, transport, { retryDelayMs: 0 });
+        }
+
+        return new ProtectedUrlFetcher(new SystemDnsResolver(), new NodeHttpTransport());
+      },
+    },
+    { provide: URL_CONTENT_EXTRACTOR, useFactory: () => new LangChainUrlContentExtractor() },
+    {
+      provide: ConnectUrl,
+      inject: [
+        CONNECTION_REPOSITORY,
+        URL_FETCHER,
+        URL_CONTENT_EXTRACTOR,
+        ConnectionProcessor,
+        KNOWLEDGE_INDEX,
+        CONNECTION_TELEMETRY,
+      ],
+      useFactory: (
+        repository: ConnectionRepository,
+        fetcher: UrlFetcher,
+        extractor: UrlContentExtractor,
+        processor: ConnectionProcessor,
+        index: KnowledgeIndex,
+        telemetry: ConnectionTelemetry,
+      ) =>
+        new ConnectUrl(
+          repository,
+          new NodeContentHasher(),
+          fetcher,
+          extractor,
+          processor,
+          index,
+          telemetry,
         ),
     },
     {

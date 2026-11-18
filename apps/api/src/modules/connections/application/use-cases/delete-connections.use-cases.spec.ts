@@ -28,6 +28,8 @@ function setup(now: () => Date = () => new Date()) {
     traceIngestion: vi.fn(),
     recordDeduplicated: vi.fn(),
     recordDeletion: vi.fn(),
+    recordUrlFetch: vi.fn(),
+    recordRejected: vi.fn(),
   };
 
   return {
