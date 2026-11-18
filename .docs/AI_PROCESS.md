@@ -99,7 +99,49 @@ As duas execuções com `orchestrate-me` implementaram 20 specs por subagentes. 
 
 (Na época, o teste unitário da API tinha 3 falhas conhecidas e declaradas como `baseline` em todas as specs; foram **corrigidas** nesta entrega, ver `QUALITY.md` §6.)
 
-## 5. Como a IA influenciou as decisões, e quem decidiu
+## 5. Linha do tempo: onde a IA mudou o rumo do projeto
+
+Os 12 dias de histórico (2026-11-07 a 2026-11-18) têm **transições** em que a participação da IA mudou o que foi construído, a ordem ou a forma. Cada linha abaixo aponta o commit, o ADR ou a spec que prova, e diz quem decidiu.
+
+```mermaid
+timeline
+  title Transições influenciadas pela IA (2026-11-07 a 2026-11-18)
+  07/11 : Fluxo spec-first desde o primeiro commit
+  09/11 : Um pedido vira 10 specs : Orquestração em paralelo : A IA recomenda, a pessoa decide diferente
+  10/11 : A medição de carga cria uma spec que ninguém pediu
+  11/11 : A IA audita o próprio código e reestrutura
+  12/11 : A recomendação inicial volta como decisão
+  16/11 : Redesign com antes e depois verificáveis
+  17/11 : Épico de experts em 11 specs
+  18/11 : O uso real e a avaliação expõem o que os testes não viam
+```
+
+| #   | Data       | Transição                                          | O que a IA fez                                                                                                                                                                                                                                                                                                    | Como o rumo mudou                                                                                                                                                                      | Quem decidiu                                                                          | Evidência                                               |
+| --- | ---------- | -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| 1   | 2026-11-07 | **O fluxo nasce com a IA**                         | As skills `create-spec`, `refine-spec`, `feature-concept`, `implement-me` e `commit-and-push` já estão no **primeiro commit**, junto com a fundação do monorepo (spec `0000`)                                                                                                                                     | Nenhuma funcionalidade entra sem spec, plano e relatório: o processo é orientado a especificação desde o dia 1, não foi adaptado depois                                                | A pessoa definiu o fluxo                                                              | `227e0ad`, `.specs/0000-fundation.md`                   |
+| 2   | 2026-11-09 | **De uma spec por vez para o paralelo**            | Um pedido ("fluxo de autenticação completo") foi quebrado por `breakdown-specs` em 10 specs com mapa de dependências; **no mesmo dia** nasceu a skill `orchestrate-me` para executá-las em paralelo, um subagente e um worktree por spec                                                                          | 9 specs de autenticação foram implementadas e integradas num único dia, em vez de em sequência. A integração achou o que cada spec isolada não via (`10c6fbf`: rota pública duplicada) | A pessoa pediu o fluxo; o processo de execução foi proposto pela IA e aceito no PR #4 | `d7f3ee3`, `1c67cb7`, `.plans/auth-breakdown.md`, PR #4 |
+| 3   | 2026-11-09 | **A IA recomenda; a pessoa decide diferente**      | Recomendou conexão direta ao Postgres (`pg`). A pessoa escolheu `supabase-js` com funções SQL. A IA **não impôs**: registrou a decisão, a alternativa recusada e o motivo                                                                                                                                         | O acesso a dados seguiu a decisão da pessoa; a recomendação ficou documentada como alternativa, o que permitiu revisitar a escolha com fatos três dias depois (linha 6)                | **A pessoa** ("o solicitante decidiu")                                                | ADR `0008`, spec `0004` §11                             |
+| 4   | 2026-11-10 | **A medição cria uma spec que ninguém pediu**      | Instrumentou a API (métricas, traces, logs) e criou testes de carga com k6. O teste mostrou que o argon2id saturava o pool de threads: teto de ~33 hashes/s; `jwtVerify` foi de 0,3 ms a 1.252 ms; p95 de `session` chegou a 12,8 s                                                                               | Nasceu a spec `0015` (limitador de hashes e limite de sign-in por IP). Depois dela, 61 sign-ins de um IP: 60 passam e os 7.454 seguintes recebem `429`                                 | A pessoa aprovou no PR #7                                                             | ADR `0013`, spec `0015`, `a101eef`, `c4e5caf`           |
+| 5   | 2026-11-11 | **A IA audita o próprio código**                   | Criou a skill `refactor-slices` e a aplicou ao código escrito dias antes: achou um controller com 8 rotas e 7 casos de uso, um controller falando direto com a infraestrutura e um guard decidindo regra na borda HTTP                                                                                            | Reestruturação para um _request handler_ por endpoint e um caso de uso por fluxo; hoje um teste de fronteira impede a regressão                                                        | A pessoa aprovou no PR #8                                                             | ADR `0014`, `2441f3a`, `d735afa`                        |
+| 6   | 2026-11-12 | **A recomendação inicial volta como decisão**      | A spec `0016` substitui o Supabase por Postgres nativo com `pg`: o ambiente pedia ~10 contêineres, chaves e JWT de plataforma que o produto não usava e uma superfície HTTP (PostgREST) que só existia para justificar a RLS                                                                                      | O que era recomendação teórica no dia 9 virou custo concreto no dia 12, e a decisão foi revertida com o registro das duas fases                                                        | **A pessoa** (a spec tem o "Solicitante" como dono)                                   | ADR `0015`, spec `0016`, `027320c`                      |
+| 7   | 2026-11-16 | **O redesign vira comparação verificável**         | Usou o Playwright para capturar **54 imagens** de "antes" e "depois" de todas as telas (inclusive mobile e escuro) e as skills `frontend-design`, `web-design-guidelines` e `shadcn`; os achados das revisões foram corrigidos                                                                                    | Uma decisão de gosto ("retro 8-bit, futebol, Brasil") passou a ser revisável tela a tela, e o tema escuro entrou no escopo                                                             | **A pessoa** definiu a direção visual (dona: Produto/Design); a IA executou           | spec `0018`, `.screenshots/`, PR #12                    |
+| 8   | 2026-11-17 | **Um épico em 11 specs, com decisões estruturais** | `breakdown-specs` quebrou "experts com conhecimento próprio" em 11 specs com dependências e regra de paralelismo; cada decisão estrutural saiu num ADR com alternativas (LangGraph como biblioteca, tenant por usuário, citações do servidor)                                                                     | A home deixou de ser decorativa (`HOME.md`); o isolamento de dado sensível virou **estrutural** em vez de um filtro que um erro poderia esquecer                                       | A pessoa aprovou no PR #13 e escolheu o paralelo (ver §6)                             | ADRs `0020` a `0030`, `b70071e`                         |
+| 9   | 2026-11-17 | **A integração descobre o que cada spec não via**  | Os gates rodados na **integração** acharam um teste de fronteira que impedia o LangGraph (`d50023d`) e uma corrida entre duas specs (`5b667ee`); num merge com conflito semântico a IA **abortou** e devolveu ao subagente dono, e a spec seguinte foi resolvida contra a base já atualizada, em vez de adivinhar | "Gate também na integração" e "conflito semântico volta ao dono" viraram prática da orquestração                                                                                       | A IA, dentro das regras da skill                                                      | `d50023d`, `5b667ee`, `380dd74`, `a39edbc`              |
+| 10  | 2026-11-18 | **O uso real vence o teste**                       | A **pessoa** rodou a API e achou o erro de `WEAVIATE_URL`; a IA achou a causa raiz (o `ConfigModule` só expõe o objeto do validador) e que os testes injetavam as variáveis num atalho. Na mesma data, tratou os 3 testes de sessão "em baseline" como defeito real e corrigiu a causa                            | Mudou a postura: **testar o caminho real de configuração** e **não aceitar "baseline" como estado normal**                                                                             | A pessoa percebeu o sintoma; a IA corrigiu a causa                                    | `dd73b82`, `b25aab3`, `TESTING.md` §7                   |
+| 11  | 2026-11-18 | **A avaliação faz a evidência virar entregável**   | A avaliação do projeto pediu documentação e evidências; a IA produziu os documentos e **capturas reproduzíveis do produto real**, e nelas descobriu o defeito de layout (botões cobrindo a conversa), que os testes não pegavam                                                                                   | Evidência passou a ser uma saída do processo, não um texto escrito no fim                                                                                                              | A pessoa pediu; a IA executou e corrigiu                                              | PR #14, `669d036`                                       |
+
+### 5.1 Quatro padrões de influência da IA
+
+Olhando as 11 transições, a IA influenciou o projeto de quatro formas, e **nenhuma delas é "a IA decide"**:
+
+1. **Escalar o processo.** Skills e orquestração mudaram o ritmo (linhas 1, 2 e 8): uma spec por vez virou um grafo de specs em paralelo.
+2. **Medir e propor.** Instrumentação e testes de carga produziram evidência que gerou trabalho novo (linha 4) e que justificou uma reversão (linha 6).
+3. **Auditar o próprio trabalho.** A IA revisou o que ela mesma escreveu e o reestruturou (linha 5) ou o corrigiu depois de uso real (linhas 9 e 10).
+4. **Registrar a divergência.** Quando a pessoa decidiu diferente da recomendação (linha 3), a IA documentou as duas posições. Foi esse registro que tornou possível, três dias depois, decidir com dados (linha 6).
+
+Em todas, **a decisão final foi humana**: aprovação no PR, resposta a uma pergunta da spec ou escolha explícita.
+
+## 6. Como a IA influenciou as decisões, e quem decidiu
 
 A IA **propôs e documentou alternativas**; a pessoa **aprovou ao integrar o PR** ou **decidiu explicitamente** quando a escolha era dela. Os casos abaixo mostram as duas coisas.
 
@@ -114,7 +156,7 @@ A IA **propôs e documentou alternativas**; a pessoa **aprovou ao integrar o PR*
 | Premissas de **Produto e Jurídico** (sem expiração automática; excluir fonte mantém o histórico; voz e imagem podem ir ao Gemini) | A IA registrou cada uma como "premissa" e como pergunta aberta, sem decidir                                                                                                                  | **A pessoa confirmou** em 2026-11-18 ("da forma sugerida"). Não é parecer formal do Jurídico, e está escrito assim nas specs               | Changelog das specs `0020`, `0025`, `0028` |
 | **Avatares dos experts**                                                                                                          | A IA construiu a ferramenta e **não gerou imagem sem chave**, deixando a geração como pendência explícita                                                                                    | **A pessoa gerou** os 7 avatares com a própria chave e os **aprovou** antes de entrarem no repositório                                     | ADR `0022`, spec `0021`                    |
 
-## 6. Quando a IA errou, e como o processo pegou
+## 7. Quando a IA errou, e como o processo pegou
 
 Evidenciar o uso da IA inclui mostrar onde ela falhou. Os casos abaixo são reais e têm commit.
 
@@ -131,7 +173,7 @@ Evidenciar o uso da IA inclui mostrar onde ela falhou. Os casos abaixo são reai
 
 O padrão que se repete: **a IA acerta mais quando existe um gate objetivo** (teste, `axe`, merge limpo) e **erra mais onde só um humano ou um uso real percebe** (o `.env` do desenvolvedor, a aparência de uma tela). Por isso o projeto separa o que se prova por teste do que depende de pessoa (`QUALITY.md` §3.2).
 
-## 7. Como auditar este processo você mesmo
+## 8. Como auditar este processo você mesmo
 
 ```powershell
 git log --format=%B | Select-String -Pattern "co-authored-by: claude" | Measure-Object   # commits com a IA como co-autora
@@ -143,7 +185,7 @@ Get-Content .claude\skills\orchestrate-me\SKILL.md                              
 
 Cada spec termina com um **histórico de alterações** (data, o que mudou, por quê) e cada verificação por spec está em `QA.md` §1, com data, comandos e resultado real.
 
-## 8. Limites do que este documento prova
+## 9. Limites do que este documento prova
 
 - Os arquivos de status e relatórios das execuções orquestradas ficam em `.claude/orchestrate/` (não versionado). O que está versionado e auditável é o histórico git, as specs (com changelog), os planos, os ADRs e `QA.md`.
 - "A pessoa aprovou ao integrar o PR" é a evidência de decisão **onde não há um registro mais explícito**; as decisões marcadas como explícitas estão nos changelogs das specs.

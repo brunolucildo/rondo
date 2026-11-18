@@ -2,7 +2,7 @@
 
 > **Público:** quem avalia a qualidade da entrega e quem vai manter o produto.
 > **Medido em:** 2026-11-18, na branch desta entrega, no Windows, com Postgres e Weaviate locais (Docker) no ar. Os números abaixo foram obtidos rodando os comandos, não estimados; cada seção diz como reproduzir.
-> **Leitura relacionada:** `QA.md` (gates, checklist e o registro por spec de cada verificação), `ARCHITECTURE.md` §4.4 (catálogo completo de sinais), `EXPERTS.md` (o agente que é observado), `AI_PROCESS.md` (como a IA entrou nos testes).
+> **Leitura relacionada:** `TESTING.md` (como os testes funcionam e como os componentes interagem), `OBSERVABILITY.md` (como as métricas, traces e logs são coletados), `QA.md` (gates, checklist e o registro por spec de cada verificação), `ARCHITECTURE.md` §4.4 (catálogo completo de sinais), `EXPERTS.md` (o agente que é observado), `AI_PROCESS.md` (como a IA entrou nos testes).
 
 ## 1. Resumo em uma tabela
 
@@ -20,6 +20,8 @@
 Total: **2.310 testes automatizados** (1.235 + 465 + 66 + 428 + 116). Nenhum chama a OpenAI nem o Gemini (§3).
 
 ## 2. A pirâmide de testes do projeto
+
+> Como cada camada monta o ambiente, quais componentes são reais ou substituídos em cada uma e como o mesmo requisito é provado em três camadas: `TESTING.md`.
 
 ```mermaid
 flowchart BT
@@ -96,6 +98,8 @@ Testar um agente de LLM tem dois problemas: respostas não determinísticas e cu
 A cobertura do `api` é só de testes unitários (`src/observability/**` e `main.ts` ficam fora de propósito); o que os 428 testes de integração exercitam a mais **não** entra nesse número.
 
 ## 5. Observabilidade
+
+> O **mecanismo** (como uma métrica sai do código e chega a um painel ou a um alerta, passo a passo) está em `OBSERVABILITY.md`. Aqui ficam o que é medido e as evidências.
 
 ### 5.1 Arquitetura
 
@@ -197,17 +201,17 @@ O repositório tem testes de carga com k6 (`load/k6`, runner `scripts/load-test.
 
 ## 6. Dívidas de qualidade tratadas nesta entrega
 
-| Dívida                                                                            | O que foi feito                                                                                                                          |
-| --------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| 3 testes de `session.service.spec.ts` falhavam desde 2026-11-16 (data fixa)       | A expiração do JWT agora usa o relógio injetado (`verify(token, now)`), com teste de regressão. `bun run test` passa por inteiro         |
-| Cobertura sem piso                                                                | Pisos em `apps/api/vitest.config.mts` e `apps/app/vite.config.ts`; `test:coverage` falha em queda real                                   |
-| Sem CI                                                                            | `.github/workflows/ci.yml`: lint, tipos, build e testes unitários com cobertura (a primeira execução no GitHub ainda não foi verificada) |
-| Teste do CLI de avatares travava sob carga                                        | Corrida no cliente falso (sinal já abortado nunca emitia de novo) corrigida; timeout do pacote aumentado                                 |
-| Dashboard sem painéis de visão, busca de links e mídia                            | Seis painéis acrescentados; o teste de ativos agora também valida as séries `url_fetch_*`                                                |
-| Regex do teste de ativos não reconhecia declarações de métrica em várias linhas   | Endurecido: a série `connection_media_cleanups_total` voltou a ser reconhecida                                                           |
-| Botões flutuantes cobriam a conversa (achado nas capturas de tela, ver `HOME.md`) | Botões passaram a fazer parte do fluxo do compositor                                                                                     |
-| TanStack Table, Charts e `date-fns` instalados sem uso                            | Removidos de `apps/app`                                                                                                                  |
-| Documentos desatualizados (README, `AGENTS.md`, `ARCHITECTURE.md`, `QA.md`)       | Estado real, contagem de alertas, URL do repositório e numeração do QA corrigidos                                                        |
+| Dívida                                                                            | O que foi feito                                                                                                                                           |
+| --------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 3 testes de `session.service.spec.ts` falhavam desde 2026-11-16 (data fixa)       | A expiração do JWT agora usa o relógio injetado (`verify(token, now)`), com teste de regressão. `bun run test` passa por inteiro                          |
+| Cobertura sem piso                                                                | Pisos em `apps/api/vitest.config.mts` e `apps/app/vite.config.ts`; `test:coverage` falha em queda real                                                    |
+| Sem CI                                                                            | `.github/workflows/ci.yml`: lint, tipos, build e testes unitários com cobertura (executou com sucesso no PR #14, job "Lint, types, build and unit tests") |
+| Teste do CLI de avatares travava sob carga                                        | Corrida no cliente falso (sinal já abortado nunca emitia de novo) corrigida; timeout do pacote aumentado                                                  |
+| Dashboard sem painéis de visão, busca de links e mídia                            | Seis painéis acrescentados; o teste de ativos agora também valida as séries `url_fetch_*`                                                                 |
+| Regex do teste de ativos não reconhecia declarações de métrica em várias linhas   | Endurecido: a série `connection_media_cleanups_total` voltou a ser reconhecida                                                                            |
+| Botões flutuantes cobriam a conversa (achado nas capturas de tela, ver `HOME.md`) | Botões passaram a fazer parte do fluxo do compositor                                                                                                      |
+| TanStack Table, Charts e `date-fns` instalados sem uso                            | Removidos de `apps/app`                                                                                                                                   |
+| Documentos desatualizados (README, `AGENTS.md`, `ARCHITECTURE.md`, `QA.md`)       | Estado real, contagem de alertas, URL do repositório e numeração do QA corrigidos                                                                         |
 
 **O que resta:** integração e E2E no CI (exigem Docker), pin de versões das imagens do Grafana/LGTM (hoje `:latest`), a avaliação com modelo real, a validação do Gemini, o leitor de tela e a revisão visual do Produto.
 
