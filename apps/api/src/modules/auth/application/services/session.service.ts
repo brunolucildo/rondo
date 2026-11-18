@@ -55,7 +55,7 @@ export class SessionService {
    * "no": it throws, so an outage never looks like a signed-out user.
    */
   async authenticate(token: string): Promise<ActiveSession | null> {
-    const claims = await this.signer.verify(token);
+    const claims = await this.signer.verify(token, this.now());
 
     if (claims === null) {
       return null;

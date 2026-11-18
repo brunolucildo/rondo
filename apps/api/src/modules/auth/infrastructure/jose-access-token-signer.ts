@@ -29,11 +29,12 @@ export class JoseAccessTokenSigner implements AccessTokenSigner {
       .sign(this.key);
   }
 
-  async verify(token: string): Promise<AccessTokenClaims | null> {
+  async verify(token: string, now?: Date): Promise<AccessTokenClaims | null> {
     try {
       const { payload } = await jwtVerify(token, this.key, {
         algorithms: [ALGORITHM],
         requiredClaims: ["sub", "sid", "iat", "exp"],
+        ...(now === undefined ? {} : { currentDate: now }),
       });
 
       // `sid` and `sub` go straight into a database query: only UUIDs get through.

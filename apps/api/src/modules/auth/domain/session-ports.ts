@@ -42,8 +42,12 @@ export interface AccessTokenClaims {
 
 export interface AccessTokenSigner {
   sign(claims: AccessTokenClaims, issuedAt: Date, expiresAt: Date): Promise<string>;
-  /** Resolves `null` for anything wrong with the token: signature, algorithm, expiry, shape. */
-  verify(token: string): Promise<AccessTokenClaims | null>;
+  /**
+   * Resolves `null` for anything wrong with the token: signature, algorithm, expiry, shape.
+   * `now` is the clock the expiry is judged against (the service passes its own), so issuing and
+   * verifying always agree on the time, in production and in tests.
+   */
+  verify(token: string, now?: Date): Promise<AccessTokenClaims | null>;
 }
 
 export interface IssuedSession {
