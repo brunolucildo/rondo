@@ -10,6 +10,7 @@ import type {
 } from "../../domain/connection-ports";
 import {
   EXTRACTION_TIMEOUT_MS,
+  IMAGE_EXTRACTION_TIMEOUT_MS,
   MAX_CHUNKS_PER_CONNECTION,
   PROCESSING_CONCURRENCY,
 } from "../../domain/connection-rules";
@@ -71,11 +72,11 @@ function errorCodeOf(error: unknown): ConnectionErrorCode {
 export class ConnectionProcessor {
   private readonly waiting: ProcessRequest[] = [];
   private readonly running = new Set<Promise<void>>();
-  private readonly extractionTimeoutMs: number;
+  private readonly extractionTimeoutMs: number | undefined;
   private readonly concurrency: number;
 
   constructor(private readonly deps: ConnectionProcessorDependencies) {
-    this.extractionTimeoutMs = deps.extractionTimeoutMs ?? EXTRACTION_TIMEOUT_MS;
+    this.extractionTimeoutMs = deps.extractionTimeoutMs;
     this.concurrency = deps.concurrency ?? PROCESSING_CONCURRENCY;
   }
 
@@ -152,7 +153,8 @@ export class ConnectionProcessor {
     const { extractors, chunker, embeddings, index } = this.deps;
     const sections = await withTimeout(
       extractors[connection.kind].extract(bytes),
-      this.extractionTimeoutMs,
+      this.extractionTimeoutMs ??
+        (connection.kind === "image" ? IMAGE_EXTRACTION_TIMEOUT_MS : EXTRACTION_TIMEOUT_MS),
     );
     const chunks = await chunker.chunk(sections);
 

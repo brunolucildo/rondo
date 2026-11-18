@@ -3,14 +3,27 @@ import { ApiError } from "../../lib/api-client";
 /** Largest file the API accepts. Checked here too so a big file is not uploaded for nothing. */
 export const MAX_FILE_BYTES = 20 * 1024 * 1024;
 
-export const ACCEPTED_EXTENSIONS = [".pdf", ".txt", ".md"] as const;
+/** Largest image the API accepts (10 MB); the 8,000 px limit per side is checked by the API. */
+export const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+
+export const ACCEPTED_EXTENSIONS = [".pdf", ".txt", ".md", ".jpg", ".jpeg", ".png"] as const;
+
+const IMAGE_EXTENSIONS = [".jpg", ".jpeg", ".png"] as const;
+
+const isImageName = (fileName: string): boolean => {
+  const name = fileName.toLowerCase();
+
+  return IMAGE_EXTENSIONS.some((extension) => name.endsWith(extension));
+};
+
+const UNSUPPORTED_TEXT = "Only PDF, TXT, Markdown, JPG and PNG files are supported.";
 
 export type ConnectionStatus = "processing" | "ready" | "failed";
 
 export interface ConnectionDto {
   id: string;
   name: string;
-  kind: "pdf" | "txt" | "md";
+  kind: "pdf" | "txt" | "md" | "image";
   sizeBytes: number;
   status: ConnectionStatus;
   chunkCount: number;
@@ -44,27 +57,61 @@ const BY_PROCESSING_CODE: Record<string, FailureMessage> = {
   },
 };
 
+/** What an image says differently from a document when it fails (the code is the same set). */
+const BY_IMAGE_PROCESSING_CODE: Record<string, FailureMessage> = {
+  NO_EXTRACTABLE_TEXT: {
+    text: "We couldn't find any text or relevant content in this image. Send a clearer, well-lit image.",
+    retryable: false,
+  },
+  CONTENT_NOT_PROCESSABLE: {
+    text: "The AI provider couldn't process this image. Try another image.",
+    retryable: false,
+  },
+  PROCESSING_UNAVAILABLE: {
+    text: "We couldn't process this image right now. Try again in a moment.",
+    retryable: true,
+  },
+};
+
 const GENERIC: FailureMessage = {
   text: "We couldn't connect this file. Try again in a moment.",
   retryable: true,
 };
 
-/** The fixed message of a `failed` connection, by the code the API gives. */
-export function describeProcessingFailure(errorCode: string | null): FailureMessage {
-  return (errorCode === null ? undefined : BY_PROCESSING_CODE[errorCode]) ?? GENERIC;
+/** The fixed message of a `failed` connection, by the code the API gives (and its kind). */
+export function describeProcessingFailure(
+  errorCode: string | null,
+  kind?: ConnectionDto["kind"],
+): FailureMessage {
+  if (errorCode === null) {
+    return GENERIC;
+  }
+
+  return (
+    (kind === "image" ? BY_IMAGE_PROCESSING_CODE[errorCode] : undefined) ??
+    BY_PROCESSING_CODE[errorCode] ??
+    GENERIC
+  );
 }
 
 /** The message of a refused upload (a 4xx or a network failure of `POST /connections`). */
-export function describeUploadFailure(error: unknown): FailureMessage {
+export function describeUploadFailure(error: unknown, fileName = ""): FailureMessage {
   if (!(error instanceof ApiError)) {
     return GENERIC;
   }
 
   switch (error.code) {
     case "UNSUPPORTED_FILE":
-      return { text: "Only PDF, TXT and Markdown files are supported.", retryable: false };
+      return { text: UNSUPPORTED_TEXT, retryable: false };
     case "FILE_TOO_LARGE":
-      return { text: "Files can have at most 20 MB.", retryable: false };
+      return {
+        text: isImageName(fileName)
+          ? "Images can have at most 10 MB."
+          : "Files can have at most 20 MB.",
+        retryable: false,
+      };
+    case "IMAGE_TOO_LARGE":
+      return { text: "Images can have at most 8,000 pixels on each side.", retryable: false };
     case "EMPTY_FILE":
       return { text: "This file is empty.", retryable: false };
     case "CONNECTION_LIMIT_REACHED":
@@ -86,11 +133,15 @@ export function checkFileBeforeUpload(file: File): FailureMessage | null {
   const name = file.name.toLowerCase();
 
   if (!ACCEPTED_EXTENSIONS.some((extension) => name.endsWith(extension))) {
-    return { text: "Only PDF, TXT and Markdown files are supported.", retryable: false };
+    return { text: UNSUPPORTED_TEXT, retryable: false };
   }
 
   if (file.size === 0) {
     return { text: "This file is empty.", retryable: false };
+  }
+
+  if (isImageName(name) && file.size > MAX_IMAGE_BYTES) {
+    return { text: "Images can have at most 10 MB.", retryable: false };
   }
 
   if (file.size > MAX_FILE_BYTES) {
@@ -133,6 +184,7 @@ const KIND_LABEL: Record<ConnectionDto["kind"], string> = {
   pdf: "PDF",
   txt: "TXT",
   md: "Markdown",
+  image: "Image",
 };
 
 export const kindLabel = (kind: ConnectionDto["kind"]): string => KIND_LABEL[kind];

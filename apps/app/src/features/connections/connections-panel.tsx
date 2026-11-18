@@ -45,7 +45,9 @@ interface ConnectionRowProps {
 
 function ConnectionRow({ connection, disabled, onDelete }: ConnectionRowProps) {
   const failure =
-    connection.status === "failed" ? describeProcessingFailure(connection.errorCode).text : null;
+    connection.status === "failed"
+      ? describeProcessingFailure(connection.errorCode, connection.kind).text
+      : null;
 
   return (
     <li className="flex flex-col gap-2 rounded-md border-2 border-border bg-background p-3 sm:flex-row sm:items-center">
@@ -188,7 +190,8 @@ export function ConnectionsPanel({ onClose }: ConnectionsPanelProps) {
             Add
           </h3>
           <p className="text-sm text-muted-foreground">
-            PDF, TXT or Markdown, up to 20 MB. Your experts will answer from what you connect.
+            PDF, TXT, Markdown, JPG or PNG, up to 20 MB (images up to 10 MB). Your experts will
+            answer from what you connect.
           </p>
           <input
             ref={inputRef}

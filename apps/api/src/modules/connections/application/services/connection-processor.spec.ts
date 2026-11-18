@@ -63,7 +63,7 @@ function setup(
   const extractor: DocumentExtractor = { extract };
   const processor = new ConnectionProcessor({
     repository,
-    extractors: { pdf: extractor, txt: extractor, md: extractor },
+    extractors: { pdf: extractor, txt: extractor, md: extractor, image: extractor },
     chunker: options.chunker ?? new RecursiveTextChunker(),
     embeddings,
     index,

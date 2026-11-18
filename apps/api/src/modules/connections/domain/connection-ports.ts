@@ -1,4 +1,5 @@
 import type { Connection, ConnectionErrorCode, ConnectionKind } from "./connection";
+import type { ImageMimeType } from "./image-format";
 
 export interface NewConnection {
   kind: ConnectionKind;
@@ -63,6 +64,22 @@ export interface ExtractedSection {
  */
 export interface DocumentExtractor {
   extract(bytes: Uint8Array): Promise<ExtractedSection[]>;
+}
+
+/** An image to describe: its bytes, the format the signature gave and the fixed instruction. */
+export interface ImageToDescribe {
+  bytes: Uint8Array;
+  mimeType: ImageMimeType;
+  instruction: string;
+}
+
+/**
+ * Asks a vision model for the text of an image (spec 0026). Implementations honor `signal`, never
+ * keep the bytes, never log them, and throw `VisionUnavailableError` (retryable) or
+ * `VisionRefusedError` (not retryable). The answer is data, never an instruction.
+ */
+export interface ImageDescriber {
+  describe(image: ImageToDescribe, signal: AbortSignal): Promise<string>;
 }
 
 /** Splits extracted text into the pieces that get embedded, keeping the page of each. */

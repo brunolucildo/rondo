@@ -12,7 +12,7 @@ import { baseLogger } from "./logger";
 
 const METER_NAME = "rondo-api";
 
-export type ConnectionIngestionKind = "pdf" | "txt" | "md";
+export type ConnectionIngestionKind = "pdf" | "txt" | "md" | "image";
 export type ConnectionIngestionOutcome = "success" | "failure";
 
 /** Closed set for the `reason` of a failed ingestion (the lower-case error codes). */
@@ -21,7 +21,8 @@ export type ConnectionIngestionReason =
   | "no_extractable_text"
   | "pdf_protected"
   | "too_many_chunks"
-  | "processing_unavailable";
+  | "processing_unavailable"
+  | "content_not_processable";
 
 export interface ConnectionIngestionResult {
   outcome: ConnectionIngestionOutcome;
@@ -44,6 +45,11 @@ function createInstruments() {
       unit: "s",
       advice: { explicitBucketBoundaries: DURATION_BUCKETS_SECONDS },
     }),
+    vision: meter.createHistogram("connection.vision.duration", {
+      description: "Time of one call to the vision model (spec 0026), by outcome.",
+      unit: "s",
+      advice: { explicitBucketBoundaries: DURATION_BUCKETS_SECONDS },
+    }),
     deletions: meter.createCounter("connection.deletions", {
       description: "Connection deletion requests (spec 0025), by scope and outcome.",
       unit: "{deletion}",
@@ -58,6 +64,17 @@ function getInstruments() {
   instruments ??= createInstruments();
 
   return instruments;
+}
+
+export type VisionCallOutcome = "success" | "refused" | "unavailable";
+
+/** Duration of one call to the vision model (spec 0026): the outcome only, never the image or its text. Never throws. */
+export function recordVisionCall(outcome: VisionCallOutcome, durationSeconds: number): void {
+  try {
+    getInstruments().vision.record(durationSeconds, { outcome });
+  } catch {
+    // Telemetry must never change the answer.
+  }
 }
 
 export type ConnectionDeletionScope = "single" | "all";

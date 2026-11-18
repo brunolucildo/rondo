@@ -15,7 +15,7 @@ import { type ActiveSession, CurrentSession } from "../../../auth";
 import { RateLimit } from "../../../rate-limit";
 import { UploadConnection } from "../../application/use-cases/upload-connection.use-case";
 import { ConnectionLimitReachedError, InvalidUploadError } from "../../domain/connection-errors";
-import { isAcceptedUpload, MAX_FILE_BYTES } from "../../domain/connection-rules";
+import { isAcceptedUpload, kindOfFileName, MAX_FILE_BYTES } from "../../domain/connection-rules";
 import { presentUpload, type UploadConnectionResponse } from "../presenters/connection.presenter";
 import { UploadExceptionFilter } from "../upload-exception.filter";
 
@@ -33,7 +33,7 @@ const UNSUPPORTED_FILE = () =>
   new ApiException(
     HttpStatus.BAD_REQUEST,
     "UNSUPPORTED_FILE",
-    "Only PDF, TXT and Markdown files are supported.",
+    "Only PDF, TXT, Markdown, JPG and PNG files are supported.",
   );
 
 const UPLOAD_OPTIONS: MulterOptions = {
@@ -92,11 +92,19 @@ export class UploadConnectionRequestHandler {
           ? new ApiException(
               HttpStatus.PAYLOAD_TOO_LARGE,
               "FILE_TOO_LARGE",
-              "The file is larger than 20 MB.",
+              kindOfFileName(file.originalname) === "image"
+                ? "The image is larger than 10 MB."
+                : "The file is larger than 20 MB.",
             )
-          : error.code === "EMPTY_FILE"
-            ? new ApiException(HttpStatus.BAD_REQUEST, "EMPTY_FILE", "The file is empty.")
-            : UNSUPPORTED_FILE();
+          : error.code === "IMAGE_TOO_LARGE"
+            ? new ApiException(
+                HttpStatus.BAD_REQUEST,
+                "IMAGE_TOO_LARGE",
+                "The image is larger than 8,000 pixels on a side.",
+              )
+            : error.code === "EMPTY_FILE"
+              ? new ApiException(HttpStatus.BAD_REQUEST, "EMPTY_FILE", "The file is empty.")
+              : UNSUPPORTED_FILE();
       }
 
       if (error instanceof ConnectionLimitReachedError) {
