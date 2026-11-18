@@ -35,6 +35,18 @@ describe("JoseAccessTokenSigner", () => {
     expect(await signer.verify(token)).toEqual({ sub: SUB, sid: SID });
   });
 
+  it("judges the expiry against the clock it is given, not the machine clock", async () => {
+    const issuedAt = new Date("2026-11-09T12:00:00.000Z");
+    const expiresAt = new Date("2026-11-16T12:00:00.000Z");
+    const token = await signer.sign({ sub: SUB, sid: SID }, issuedAt, expiresAt);
+
+    expect(await signer.verify(token, new Date("2026-11-10T12:00:00.000Z"))).toEqual({
+      sub: SUB,
+      sid: SID,
+    });
+    expect(await signer.verify(token, new Date("2026-11-17T12:00:00.000Z"))).toBeNull();
+  });
+
   it("refuses a secret shorter than 32 characters without echoing it", () => {
     const short = "a".repeat(31);
 

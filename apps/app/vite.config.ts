@@ -15,6 +15,8 @@ export default defineConfig({
       reporter: ["text", "html", "json-summary"],
       reportsDirectory: "../../coverage/app",
       include: ["src/**/*.{ts,tsx}"],
+      // Floors a few points under the measured values (2026-11-18: 95.7 / 89.4 / 97.4 / 95.8).
+      thresholds: { statements: 92, branches: 85, functions: 94, lines: 92 },
     },
   },
 });
