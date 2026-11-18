@@ -8,19 +8,23 @@
 
 **Rondo** (antes "Analytics Personas") é uma plataforma para criar, configurar e operar _experts_: agentes de IA especializados em funções de um clube de futebol (Head Coach, Analista de Desempenho, Jurídico Esportivo, Fisiologista etc.). Os experts consomem dados de conectores externos (Notion, Google Drive, PDF, Markdown, Confluence, Jira, Linear, ClickUp, Google Docs, Google Sheets) para produzir análises sob demanda. O nome do produto é **Rondo**; o único identificador técnico que ainda usa `analytics-personas` é o repositório remoto no GitHub, até ele ser renomeado; pacotes, containers do Docker, telemetria e e-mails já usam Rondo.
 
-**Estado atual:** fundação técnica pronta (spec `0000-foundation`). O monorepo Turborepo tem um cliente React + Vite (`apps/app`), uma API Nest.js (`apps/api`), o site de docs em Next.js (`apps/docs`) e o design system (`packages/ui`), com Postgres local (Docker, acesso por `pg`), observabilidade Grafana LGTM e testes unitário, de integração e E2E. O espaço de URLs (`/api/v1/*`, `/auth/*`, `/app/*`) e o idioma en-US estão definidos em `DEVELOPMENT.md` §13 (spec `0001`). **Ainda não existem** features de produto, autenticação completa (há cadastro, confirmação de conta, sign-in, sessão, sign-out e o pedido de redefinição de senha; redefinição de senha com troca da senha), ingestão de conectores, agentes nem CI. Não trate a arquitetura-alvo como se já estivesse implementada.
+**Estado atual (2026-11-18):** o produto funciona de ponta a ponta. A pessoa se cadastra, confirma a conta, entra e conversa, na home de `/app`, com **sete experts de IA** (LangGraph.js + OpenAI) que respondem a partir das **fontes que ela mesma conecta** (PDF, TXT, Markdown, imagens, links, áudio e vídeo), com o histórico guardado, **citações montadas pelo servidor**, declaração de lacuna quando nenhuma fonte cobre a pergunta e exclusão completa das conexões. O monorepo Turborepo tem o cliente React + Vite (`apps/app`), a API Nest.js (`apps/api`), o site de docs (`apps/docs`), o design system (`packages/ui`) e a ferramenta dos avatares (`packages/experts-avatars`), com Postgres local, Weaviate (vetores, um tenant por usuário), observabilidade Grafana LGTM (dashboards e 22 alertas) e testes unitário, de integração e E2E. O espaço de URLs (`/api/v1/*`, `/auth/*`, `/app/*`) e o idioma en-US estão em `DEVELOPMENT.md` §13. **Ainda não existem:** conectores de terceiros (Notion, Drive, Jira etc.), deploy e CD, exclusão de conta, CI de integração e E2E (o CI atual cobre lint, tipos, build e unitários). Não trate a arquitetura-alvo como se já estivesse implementada.
 
 ## 2. Leia antes de trabalhar
 
-| Se você vai...                              | Leia                             |
-| ------------------------------------------- | -------------------------------- |
-| entender o produto e o vocabulário          | `BUSINESS.md`                    |
-| tocar em estrutura, apps, pacotes ou stack  | `ARCHITECTURE.md`                |
-| criar ou alterar UI                         | `DESIGN.md` + `DESIGN_SYSTEM.md` |
-| escrever qualquer código                    | `DEVELOPMENT.md`                 |
-| criar rota, endpoint ou texto de interface  | `DEVELOPMENT.md` §13             |
-| validar uma entrega                         | `QA.md`                          |
-| iniciar uma tarefa ou finalizar uma entrega | `RULES.md`                       |
+| Se você vai...                                               | Leia                             |
+| ------------------------------------------------------------ | -------------------------------- |
+| entender o produto e o vocabulário                           | `BUSINESS.md`                    |
+| entender os agentes especialistas e como se ligam ao produto | `EXPERTS.md`                     |
+| entender a home e o redesign visual                          | `HOME.md`                        |
+| ver evidências de testes e observabilidade                   | `QUALITY.md`                     |
+| ver como a IA foi usada no desenvolvimento                   | `AI_PROCESS.md`                  |
+| tocar em estrutura, apps, pacotes ou stack                   | `ARCHITECTURE.md`                |
+| criar ou alterar UI                                          | `DESIGN.md` + `DESIGN_SYSTEM.md` |
+| escrever qualquer código                                     | `DEVELOPMENT.md`                 |
+| criar rota, endpoint ou texto de interface                   | `DEVELOPMENT.md` §13             |
+| validar uma entrega                                          | `QA.md`                          |
+| iniciar uma tarefa ou finalizar uma entrega                  | `RULES.md`                       |
 
 ## 3. Comandos reais
 
@@ -51,7 +55,7 @@ Portas: `apps/app` → **5173**; `apps/docs` → **3001**; `apps/api` → **3002
 
 **Não existem** (não invente): `bun codes:fix`, `bun run web`, scripts de ESLint ou Prettier. A primeira execução do E2E exige `bunx playwright install`.
 
-**Baseline em 2026-11-07:** lint, tipos, build, testes (unitário, integração e E2E), `infra:up`, `db:migrate` e `infra:down` passam. Detalhes e evidências em `QA.md` §1.1.
+**Baseline em 2026-11-18:** lint, tipos, build, testes unitários (api 1.235, app 465), de integração (428) e E2E (116), `infra:up`, `db:migrate` e `infra:down` passam, sem falhas conhecidas; a cobertura tem piso (`QA.md` §1 e §6). Evidências e como reproduzir em `QUALITY.md`.
 
 ## 4. Regras não negociáveis
 
